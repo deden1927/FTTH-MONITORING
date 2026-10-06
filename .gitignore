@@ -1,0 +1,8 @@
+node_modules/
+deploy_siap_upload.zip
+*.pptx
+*.py
+data/db.json
+.env
+.DS_Store
+Thumbs.db

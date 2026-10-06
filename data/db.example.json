@@ -1,0 +1,470 @@
+{
+  "executors": [
+    {
+      "id": "exec-1",
+      "name": "Tim Internal #001 (koor: Mifta)",
+      "type": "Internal",
+      "phone": "0812-8899-1001",
+      "fleet_no": "B-9142-TA / GrandMax",
+      "standard_rates": "Uang Jalan: Rp 450.000/hari + Bahan Bakar",
+      "rating": 4.9,
+      "active_wos": 2
+    },
+    {
+      "id": "exec-2",
+      "name": "Tim Internal Bravo (Koord: Pak Rizal)",
+      "type": "Internal",
+      "phone": "0813-7766-2002",
+      "fleet_no": "B-9521-TX / Luxio",
+      "standard_rates": "Uang Jalan: Rp 450.000/hari + Bahan Bakar",
+      "rating": 4.7,
+      "active_wos": 1
+    },
+    {
+      "id": "exec-3",
+      "name": "Mandor Asep Subagja (Subkon OSP)",
+      "type": "Mandor",
+      "phone": "0857-1122-3344",
+      "fleet_no": "-",
+      "standard_rates": "Tiang: Rp 65.000/btg | Tarik KU: Rp 1.800/m | ODP: Rp 150.000/titik",
+      "rating": 4.8,
+      "active_wos": 2
+    },
+    {
+      "id": "exec-4",
+      "name": "Mandor Hendra Wijaya (Spesialis KU & Jointing)",
+      "type": "Mandor",
+      "phone": "0819-3344-5566",
+      "fleet_no": "-",
+      "standard_rates": "Tiang: Rp 70.000/btg | Tarik KU: Rp 1.900/m | ODP: Rp 160.000/titik",
+      "rating": 4.6,
+      "active_wos": 1
+    },
+    {
+      "id": "exec-5",
+      "name": "Mandor Budi Santoso (Borongan Cepat)",
+      "type": "Mandor",
+      "phone": "0878-5544-2211",
+      "fleet_no": "-",
+      "standard_rates": "Tiang: Rp 60.000/btg | Tarik KU: Rp 1.750/m | ODP: Rp 140.000/titik",
+      "rating": 4.4,
+      "active_wos": 1
+    }
+  ],
+  "drums": [
+    {
+      "id": "DRUM-001",
+      "cable_type": "Kabel Udara (KU) 48 Core G.652D",
+      "initial_meters": 4000,
+      "used_meters": 3200,
+      "remaining_meters": 800,
+      "allocated_to": "SP-TA-JKT-2026-0819",
+      "status": "Active"
+    },
+    {
+      "id": "DRUM-002",
+      "cable_type": "Kabel Udara (KU) 24 Core G.652D",
+      "initial_meters": 4000,
+      "used_meters": 3850,
+      "remaining_meters": 150,
+      "allocated_to": "WO-ICON-BDG-0142",
+      "status": "Active"
+    },
+    {
+      "id": "DRUM-003",
+      "cable_type": "Kabel Udara (KU) 96 Core G.652D",
+      "initial_meters": 5000,
+      "used_meters": 4100,
+      "remaining_meters": 900,
+      "allocated_to": "SPK-SRG-CRB-0089",
+      "status": "Active"
+    },
+    {
+      "id": "DRUM-004",
+      "cable_type": "Kabel Udara (KU) 24 Core G.652D",
+      "initial_meters": 4000,
+      "used_meters": 0,
+      "remaining_meters": 4000,
+      "allocated_to": "SP-TA-TGR-2026-0412",
+      "status": "Reserved"
+    }
+  ],
+  "projects": [
+    {
+      "id": "proj-5",
+      "wo_number": "WO-ICON-BGR-0095",
+      "client_name": "Icon Net (PLN)",
+      "cluster_name": "Area Sentul City - Babakan Madang",
+      "executor_type": "Internal",
+      "executor_id": "exec-2",
+      "executor_name": "Tim Internal Bravo (Koord: Pak Rizal)",
+      "contract_value": 520000000,
+      "mandor_cost": 160000000,
+      "gross_margin": 360000000,
+      "margin_percent": 69.2,
+      "status": "Done",
+      "target_date": "2026-09-30",
+      "created_at": "2026-08-15"
+    },
+    {
+      "id": "proj-1790937397393",
+      "wo_number": "dsfdsfsd",
+      "client_name": "ID Net",
+      "cluster_name": "SETRO",
+      "executor_type": "Mandor",
+      "executor_id": "exec-3",
+      "executor_name": "Mandor Asep Subagja (Subkon OSP)",
+      "contract_value": 10000000,
+      "mandor_cost": 6000000,
+      "gross_margin": 4000000,
+      "margin_percent": 40,
+      "status": "Done",
+      "target_date": "2026-10-02",
+      "created_at": "2026-10-02"
+    },
+    {
+      "id": "proj-1790938002657",
+      "wo_number": "JPP MDR",
+      "client_name": "Telkom Akses",
+      "cluster_name": "BKL",
+      "executor_type": "Mandor",
+      "executor_id": "exec-4",
+      "executor_name": "Mandor Hendra Wijaya (Spesialis KU & Jointing)",
+      "contract_value": 10000000,
+      "mandor_cost": 8000000,
+      "gross_margin": 2000000,
+      "margin_percent": 20,
+      "status": "Done",
+      "target_date": "2026-10-02",
+      "created_at": "2026-10-02"
+    }
+  ],
+  "milestones": [
+    {
+      "id": "m-5-1",
+      "project_id": "proj-5",
+      "stage_name": "Penanaman Tiang",
+      "status": "Done",
+      "progress_percent": 100,
+      "notes": "Selesai 100% (160 tiang).",
+      "blocked_reason": "",
+      "otdr_loss": "",
+      "opm_power": ""
+    },
+    {
+      "id": "m-5-2",
+      "project_id": "proj-5",
+      "stage_name": "Penarikan KU Fiber",
+      "status": "Done",
+      "progress_percent": 100,
+      "notes": "Tarikan kabel 4.800m KU 24C tuntas.",
+      "blocked_reason": "",
+      "otdr_loss": "",
+      "opm_power": ""
+    },
+    {
+      "id": "m-5-3",
+      "project_id": "proj-5",
+      "stage_name": "Instalasi ODP & Splicing",
+      "status": "Done",
+      "progress_percent": 100,
+      "notes": "28 titik ODP selesai jointing & splitter 1:8 terpasang.",
+      "blocked_reason": "",
+      "otdr_loss": "",
+      "opm_power": ""
+    },
+    {
+      "id": "m-5-4",
+      "project_id": "proj-5",
+      "stage_name": "Testing & ATP",
+      "status": "Done",
+      "progress_percent": 100,
+      "notes": "Hasil ukur OTDR rata-rata 0.22 dB/km, Redaman OPM -18.4 dBm (Pass Standar). Berkas ATP telah ditandatangani pengawas Icon+.",
+      "blocked_reason": "",
+      "otdr_loss": "0.22 dB/km (Lolos)",
+      "opm_power": "-18.4 dBm (Lolos)"
+    },
+    {
+      "id": "m-proj-1790937397393-1",
+      "project_id": "proj-1790937397393",
+      "stage_name": "Penanaman Tiang",
+      "status": "Done",
+      "progress_percent": 0,
+      "notes": "Penyiapan perizinan ROW & koordinasi mandor.",
+      "blocked_reason": "",
+      "otdr_loss": "",
+      "opm_power": ""
+    },
+    {
+      "id": "m-proj-1790937397393-2",
+      "project_id": "proj-1790937397393",
+      "stage_name": "Penarikan KU Fiber",
+      "status": "Done",
+      "progress_percent": 0,
+      "notes": "Menunggu alokasi drum kabel fiber.",
+      "blocked_reason": "",
+      "otdr_loss": "",
+      "opm_power": ""
+    },
+    {
+      "id": "m-proj-1790937397393-3",
+      "project_id": "proj-1790937397393",
+      "stage_name": "Instalasi ODP & Splicing",
+      "status": "Done",
+      "progress_percent": 0,
+      "notes": "Menunggu kabel KU selesai ditarik.",
+      "blocked_reason": "",
+      "otdr_loss": "",
+      "opm_power": ""
+    },
+    {
+      "id": "m-proj-1790937397393-4",
+      "project_id": "proj-1790937397393",
+      "stage_name": "Testing & ATP",
+      "status": "Done",
+      "progress_percent": 0,
+      "notes": "Uji OTDR & OPM setelah seluruh ODP terpasang.",
+      "blocked_reason": "",
+      "otdr_loss": "-",
+      "opm_power": "-"
+    },
+    {
+      "id": "m-proj-1790938002657-1",
+      "project_id": "proj-1790938002657",
+      "stage_name": "Penanaman Tiang",
+      "status": "Done",
+      "progress_percent": 0,
+      "notes": "Penyiapan perizinan ROW & koordinasi mandor.",
+      "blocked_reason": "",
+      "otdr_loss": "",
+      "opm_power": ""
+    },
+    {
+      "id": "m-proj-1790938002657-2",
+      "project_id": "proj-1790938002657",
+      "stage_name": "Penarikan KU Fiber",
+      "status": "Done",
+      "progress_percent": 0,
+      "notes": "Menunggu alokasi drum kabel fiber.",
+      "blocked_reason": "",
+      "otdr_loss": "",
+      "opm_power": ""
+    },
+    {
+      "id": "m-proj-1790938002657-3",
+      "project_id": "proj-1790938002657",
+      "stage_name": "Instalasi ODP & Splicing",
+      "status": "Done",
+      "progress_percent": 0,
+      "notes": "Menunggu kabel KU selesai ditarik.",
+      "blocked_reason": "",
+      "otdr_loss": "",
+      "opm_power": ""
+    },
+    {
+      "id": "m-proj-1790938002657-4",
+      "project_id": "proj-1790938002657",
+      "stage_name": "Testing & ATP",
+      "status": "Done",
+      "progress_percent": 0,
+      "notes": "Uji OTDR & OPM setelah seluruh ODP terpasang.",
+      "blocked_reason": "",
+      "otdr_loss": "-",
+      "opm_power": "-"
+    }
+  ],
+  "boq_items": [],
+  "invoices": [
+    {
+      "id": "inv-001",
+      "project_id": "proj-5",
+      "wo_number": "WO-ICON-BGR-0095",
+      "client_name": "Icon Net (PLN)",
+      "term_name": "Termin 1: Uang Muka (DP 20%)",
+      "amount": 104000000,
+      "status": "Lunas",
+      "invoice_date": "2026-08-20",
+      "due_date": "2026-09-19",
+      "paid_date": "2026-09-15",
+      "aging_category": "Lunas"
+    },
+    {
+      "id": "inv-002",
+      "project_id": "proj-5",
+      "wo_number": "WO-ICON-BGR-0095",
+      "client_name": "Icon Net (PLN)",
+      "term_name": "Termin 2: BAST 100% Lolos ATP",
+      "amount": 390000000,
+      "status": "Lunas",
+      "invoice_date": "2026-10-01",
+      "due_date": "2026-10-31",
+      "paid_date": "2026-10-02",
+      "aging_category": "Lunas"
+    }
+  ],
+  "mandor_payouts": [
+    {
+      "id": "pay-1790938023238",
+      "project_id": "proj-1790938002657",
+      "mandor_name": "Mandor Hendra Wijaya (Spesialis KU & Jointing)",
+      "milestone_stage": "Pekerjaan Selesai (100%)",
+      "amount": 8000000,
+      "status": "Lunas",
+      "verified_by_pm": true,
+      "notes": "Dibuat otomatis oleh sistem saat semua milestone Done (SOP Anti Boncos)",
+      "payout_date": "2026-10-02"
+    }
+  ],
+  "users": [
+    {
+      "id": 1,
+      "username": "bos",
+      "password": "$2b$10$h/O5xTYSDUQ4p6CgRb4uC.e70l4kBiXlmxXiriVW2VPAm43kHH.66",
+      "role": "direktur",
+      "name": "Pak Direktur"
+    },
+    {
+      "id": 2,
+      "username": "pm",
+      "password": "$2b$10$Q050LG63M85Nf7RAT6l.We4Yu1bMD6OoaKmN8Fdc.D09oGyOqdYWC",
+      "role": "pm",
+      "name": "Project Manager"
+    },
+    {
+      "id": 3,
+      "username": "finance",
+      "password": "$2b$10$DMOUEXnx5VGt8Jz5nS8XWuQHHN3f1JdyN/SvlueNaGsCejt6LNiWS",
+      "role": "finance",
+      "name": "Admin Finance"
+    },
+    {
+      "id": 99,
+      "username": "admin",
+      "password": "$2b$10$NMv76E84Cx8NBKASYtpG6uHHP1H7LEPBd6hp5GRgDfzOLhNXjGSh2",
+      "role": "superadmin",
+      "name": "Super Admin IT"
+    }
+  ],
+  "gallery": [
+    {
+      "id": "gal-1791102692675",
+      "title": "Gathering & Outing Akbar PT AKU",
+      "category": "refreshing",
+      "description": "Gathering Bromo",
+      "image_url": "/images/gallery/gal-1791102692674.jpg",
+      "created_at": "2026-10-04"
+    },
+    {
+      "id": "gal-1791102659685",
+      "title": "Gathering & Outing Akbar PT AKU",
+      "category": "refreshing",
+      "description": "Gathering Bromo",
+      "image_url": "/images/gallery/gal-1791102659644.jpg",
+      "created_at": "2026-10-04"
+    },
+    {
+      "id": "gal-1",
+      "title": "Gathering & Outing Akbar PT AKU",
+      "category": "refreshing",
+      "description": "Gathering Bromo",
+      "image_url": "/images/gallery/gal-1791102614359.jpg",
+      "created_at": "2026-10-04"
+    },
+    {
+      "id": "gal-2",
+      "title": "Gathering & Outing Akbar PT AKU",
+      "category": "refreshing",
+      "description": "Gathering Bromo",
+      "image_url": "/images/gallery/gal-1791102819127.jpg",
+      "created_at": "2026-10-04"
+    },
+    {
+      "id": "gal-3",
+      "title": "Instalasi Tiang Baru",
+      "category": "lapangan",
+      "description": "Penanaman tiang besi 7M/9M standar K3",
+      "image_url": "/images/gallery/gal-1791102869673.jpg",
+      "created_at": "2026-10-01"
+    },
+    {
+      "id": "gal-4",
+      "title": "Penyambungan Core Fiber",
+      "category": "splicing",
+      "description": "Splicing presisi tinggi dengan loss minim",
+      "image_url": "/images/gallery/gal-1791102888636.jpg",
+      "created_at": "2026-10-01"
+    },
+    {
+      "id": "gal-5",
+      "title": "Instalasi ODC & Rack Server",
+      "category": "splicing",
+      "description": "Perapihan tray manajemen core & patch cord",
+      "image_url": "/images/gallery/gal-1791102953301.jpg",
+      "created_at": "2026-10-01"
+    },
+    {
+      "id": "gal-6",
+      "title": "Uji Redaman OTDR & OPM",
+      "category": "qc",
+      "description": "Pengukuran redaman sebelum serah terima ATP",
+      "image_url": "/images/gallery/gal-1791103036402.jpg",
+      "created_at": "2026-10-01"
+    },
+    {
+      "id": "gal-7",
+      "title": "Morning Toolbox Meeting",
+      "category": "k3",
+      "description": "Inspeksi APD lengkap dan mitigasi risiko kerja",
+      "image_url": "/images/gallery/gal-1791103050641.jpg",
+      "created_at": "2026-10-01"
+    },
+    {
+      "id": "gal-8",
+      "title": "Armada Operasional Siaga",
+      "category": "armada",
+      "description": "Unit kendaraan operasional mobilitas tim teknisi",
+      "image_url": "/images/gallery/gal-1791103061966.jpg",
+      "created_at": "2026-10-01"
+    },
+    {
+      "id": "gal-9",
+      "title": "Koordinasi Proyek & PM",
+      "category": "manajemen",
+      "description": "Sinkronisasi target SPK dan jadwal lapangan",
+      "image_url": "/images/gallery/gal-1791103077887.jpg",
+      "created_at": "2026-10-01"
+    },
+    {
+      "id": "gal-10",
+      "title": "Pengelolaan Drum & Material",
+      "category": "armada",
+      "description": "Kontrol stok kabel fiber KU 24C, 48C, 96C",
+      "image_url": "/images/gallery/gal-1791103106041.jpg",
+      "created_at": "2026-10-01"
+    },
+    {
+      "id": "gal-11",
+      "title": "Penarikan Kabel Udara (KU)",
+      "category": "lapangan",
+      "description": "Pemasangan span kawat dan tensioning kabel",
+      "image_url": "/images/gallery/gal-1791103124777.jpg",
+      "created_at": "2026-10-01"
+    },
+    {
+      "id": "gal-12",
+      "title": "Instalasi Box ODP Tiang",
+      "category": "lapangan",
+      "description": "Pemasangan bracket tiang & pelabelan barcode ODP",
+      "image_url": "/images/gallery/gal-1791103137685.jpg",
+      "created_at": "2026-10-01"
+    },
+    {
+      "id": "gal-14",
+      "title": "Sinergi & Soliditas Tim",
+      "category": "manajemen",
+      "description": "Keluarga besar teknisi, pengawas & manajemen PT AKU",
+      "image_url": "/images/gallery/gal-1791103177043.jpg",
+      "created_at": "2026-10-01"
+    }
+  ]
+}

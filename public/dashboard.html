@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PT Akses Kwalitas Unggul - Monitoring & Keuangan Vendor FTTH</title>
+  <link rel="icon" type="image/png" href="/images/logo.png">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            telco: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              900: '#0c4a6e'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .status-badge-todo { background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+    .status-badge-inprogress { background-color: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; }
+    .status-badge-blocked { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+    .status-badge-done { background-color: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+
+  <!-- LOGIN CONTAINER -->
+  <div id="login-container" class="flex-1 flex items-center justify-center min-h-screen bg-slate-900">
+    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
+      <div class="text-center mb-6">
+        <img src="/images/logo.png" alt="Logo PT Akses Kwalitas Unggul" class="h-20 w-auto object-contain mx-auto mb-4 drop-shadow-md">
+        <h2 class="text-2xl font-bold text-slate-800">PT Akses Kwalitas Unggul</h2>
+        <p class="text-sm text-slate-500">Sign in to continue</p>
+      </div>
+      <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Username</label>
+          <input type="text" id="loginUsername" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
+          <input type="password" id="loginPassword" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500" required>
+        </div>
+        <div id="loginError" class="text-red-500 text-sm hidden text-center"></div>
+        <button type="submit" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-2.5 rounded-lg transition shadow-md">
+          Sign In
+        </button>
+      </form>
+      <div class="mt-6 text-xs text-slate-400 text-center space-y-1">
+        <p>Gunakan akun berikut untuk demo:</p>
+        <p><b>bos / 123</b> (Direktur)</p>
+        <p><b>pm / 123</b> (Project Manager)</p>
+        <p><b>finance / 123</b> (Admin Finance)</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APP CONTAINER -->
+  <div id="app-container" style="display: none;" class="flex-1 flex flex-col">
+    <!-- TOP HEADER NAVBAR -->
+    <header class="bg-slate-900 text-white sticky top-0 z-40 shadow-lg border-b border-slate-800">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <img src="/images/logo.png" alt="Logo PT AKU" class="h-10 w-auto object-contain drop-shadow-sm">
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="font-bold text-lg tracking-wide text-white">PT Akses Kwalitas Unggul</span>
+            
+          </div>
+          <p class="text-xs text-slate-400">Telkom Akses • Icon Net (PLN) • ID Net</p>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div class="flex items-center space-x-3">
+        <div class="flex items-center space-x-2 mr-2 border-r border-slate-700 pr-3">
+          <i data-lucide="user-circle" class="w-5 h-5 text-slate-400"></i>
+          <div class="flex flex-col">
+            <span id="userNameDisplay" class="text-xs font-semibold text-white"></span>
+            <span id="userRoleDisplay" class="text-[10px] text-sky-400 uppercase tracking-wider"></span>
+          </div>
+        </div>
+        <button onclick="openModal('modalAddProject')" id="btnTambahWO" class="flex items-center space-x-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition shadow">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i>
+          <span>Tambah WO Baru</span>
+        </button>
+        <button onclick="exportProjectsCSV()" class="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-lg border border-slate-700 transition">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span>Ekspor CSV</span>
+        </button>
+        <button onclick="handleLogout()" class="flex items-center space-x-1.5 bg-red-900/50 hover:bg-red-800 text-red-200 hover:text-white text-xs font-semibold px-3 py-2 rounded-lg transition border border-red-800/50">
+          <i data-lucide="log-out" class="w-4 h-4"></i>
+          <span>Logout</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- NAVIGATION TABS -->
+    <div class="bg-slate-800/90 border-t border-slate-700/60 px-4 sm:px-6 lg:px-8">
+      <div class="max-w-7xl mx-auto flex space-x-1 overflow-x-auto py-1">
+        <button onclick="switchTab('dashboard')" id="tab-dashboard" class="nav-tab active flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md transition text-sky-400 bg-slate-900 border border-slate-700">
+          <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+          <span>Executive Dashboard (Bos)</span>
+        </button>
+        <button onclick="switchTab('projects')" id="tab-projects" class="nav-tab flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md transition text-slate-400 hover:text-white hover:bg-slate-700/50">
+          <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+          <span>Manajemen WO & Lapangan</span>
+        </button>
+        <button onclick="switchTab('boq')" id="tab-boq" class="nav-tab flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md transition text-slate-400 hover:text-white hover:bg-slate-700/50">
+          <i data-lucide="calculator" class="w-4 h-4"></i>
+          <span>Kontrol BOQ & Drum Kabel</span>
+        </button>
+        <button onclick="switchTab('finance')" id="tab-finance" class="nav-tab flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md transition text-slate-400 hover:text-white hover:bg-slate-700/50">
+          <i data-lucide="wallet" class="w-4 h-4"></i>
+          <span>Cashflow 2 Arah (Klien & Mandor)</span>
+        </button>
+        <button onclick="switchTab('executors')" id="tab-executors" class="nav-tab flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md transition text-slate-400 hover:text-white hover:bg-slate-700/50">
+          <i data-lucide="users" class="w-4 h-4"></i>
+          <span>Master Eksekutor</span>
+        </button>
+        <button onclick="switchTab('users')" id="tab-users" class="nav-tab flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md transition text-slate-400 hover:text-white hover:bg-slate-700/50" style="display: none;">
+          <i data-lucide="shield" class="w-4 h-4"></i>
+          <span>Manajemen User (Admin)</span>
+        </button>
+        <button onclick="switchTab('gallery-mgmt')" id="tab-gallery-mgmt" class="nav-tab flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md transition text-slate-400 hover:text-white hover:bg-slate-700/50" style="display: none;">
+          <i data-lucide="image" class="w-4 h-4"></i>
+          <span>Kelola Galeri Index</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+    <!-- ============================================================= -->
+    <!-- TAB 1: EXECUTIVE DASHBOARD (PANDANGAN DIREKSI / BOS)           -->
+    <!-- ============================================================= -->
+    <div id="content-dashboard" class="tab-content space-y-6">
+      
+      <!-- Banner Sambutan -->
+      <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-sky-950 p-6 rounded-2xl shadow-lg border border-slate-700 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <span class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 mb-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>Real-time Financial & Operational Sync</span>
+          </span>
+          <h1 class="text-2xl font-bold tracking-tight">Executive Revenue & Operations Overview</h1>
+          <p class="text-sm text-slate-300 mt-1">Pantauan komprehensif kas masuk, sisa piutang, dan estimasi laba kotor per SP/WO.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="bg-slate-800/80 px-4 py-2 rounded-xl border border-slate-700 text-right">
+            <span class="text-xs text-slate-400 block">Klien Aktif</span>
+            <span class="font-bold text-sky-400 text-sm">Telkom • Icon+ • ID Net</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4 KPI CARDS -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- KPI 1: Order Book -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <div class="flex justify-between items-start">
+            <div>
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Pekerjaan Berjalan</p>
+              <h3 id="kpi-orderbook" class="text-2xl font-bold text-slate-900 mt-1">Rp 0</h3>
+              <p id="kpi-project-count" class="text-xs text-slate-500 mt-1">0 Proyek Aktif</p>
+            </div>
+            <div class="p-2.5 bg-sky-50 text-sky-600 rounded-lg">
+              <i data-lucide="briefcase" class="w-5 h-5"></i>
+            </div>
+          </div>
+          <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span>Pagu Kontrak SP/WO</span>
+            <span class="font-semibold text-sky-600">Order Book</span>
+          </div>
+        </div>
+
+        <!-- KPI 2: Kas Masuk YTD -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <div class="flex justify-between items-start">
+            <div>
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Kas Diterima YTD</p>
+              <h3 id="kpi-kasmasuk" class="text-2xl font-bold text-emerald-600 mt-1">Rp 0</h3>
+              <p class="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
+                <span>Invoice Lunas</span>
+              </p>
+            </div>
+            <div class="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg">
+              <i data-lucide="banknote" class="w-5 h-5"></i>
+            </div>
+          </div>
+          <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span>Realisasi Kas Masuk</span>
+            <span class="font-semibold text-emerald-600">Inflow Riil</span>
+          </div>
+        </div>
+
+        <!-- KPI 3: Sisa Piutang Klien -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <div class="flex justify-between items-start">
+            <div>
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Sisa Piutang</p>
+              <h3 id="kpi-piutang" class="text-2xl font-bold text-amber-600 mt-1">Rp 0</h3>
+              <p class="text-xs text-amber-600 mt-1">Dalam Proses BAST / Aging</p>
+            </div>
+            <div class="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
+              <i data-lucide="clock" class="w-5 h-5"></i>
+            </div>
+          </div>
+          <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span>Piutang Klien Berjalan</span>
+            <span class="font-semibold text-amber-600">Pending Pencairan</span>
+          </div>
+        </div>
+
+        <!-- KPI 4: Estimasi Margin Kotor -->
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <div class="flex justify-between items-start">
+            <div>
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Estimasi Laba Kotor</p>
+              <h3 id="kpi-margin" class="text-2xl font-bold text-indigo-600 mt-1">Rp 0</h3>
+              <p id="kpi-margin-pct" class="text-xs text-indigo-600 mt-1 font-semibold">Margin: 0%</p>
+            </div>
+            <div class="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg">
+              <i data-lucide="trending-up" class="w-5 h-5"></i>
+            </div>
+          </div>
+          <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span>Kontrak - Upah Mandor</span>
+            <span class="font-semibold text-indigo-600">Gross Margin</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- GRAFIK SECTION -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Monthly Revenue Chart (2/3 width) -->
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm lg:col-span-2">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="font-bold text-base text-slate-900">Tren Revenue & Kas Masuk Bulanan</h2>
+              <p class="text-xs text-slate-500">Perbandingan antara invoice yang ditagihkan vs kas riil masuk rekening</p>
+            </div>
+            <span class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded font-medium">Tahun 2026</span>
+          </div>
+          <div class="h-64">
+            <canvas id="revenueChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Portofolio Klien Chart (1/3 width) -->
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h2 class="font-bold text-base text-slate-900">Distribusi Portofolio Klien</h2>
+                <p class="text-xs text-slate-500">Komposisi nilai kontrak per klien</p>
+              </div>
+            </div>
+            <div class="h-48 relative flex items-center justify-center">
+              <canvas id="clientChart"></canvas>
+            </div>
+          </div>
+          <div id="client-breakdown-legend" class="mt-4 pt-3 border-t border-slate-100 text-xs space-y-1.5 text-slate-600">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </div>
+
+      <!-- RADAR PIUTANG AGING & REKAP STATUS LAPANGAN -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Radar Aging Piutang Klien -->
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-500"></i>
+              <h2 class="font-bold text-base text-slate-900">Radar Piutang Tertahan (Aging AR)</h2>
+            </div>
+            <button onclick="switchTab('finance')" class="text-xs text-sky-600 hover:text-sky-700 font-semibold">Kelola Tagihan &rarr;</button>
+          </div>
+          <div id="aging-table-container" class="overflow-x-auto">
+            <!-- Table dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Ringkasan Eksekutor (Internal vs Mandor) -->
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center space-x-2">
+                <i data-lucide="pie-chart" class="w-5 h-5 text-indigo-600"></i>
+                <h2 class="font-bold text-base text-slate-900">Alokasi Eksekutor: Internal vs Mandor</h2>
+              </div>
+            </div>
+            <div id="executor-summary-content" class="space-y-4">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span>Sistem Otomatis Pengunci Upah Mandor</span>
+            <span class="text-emerald-600 font-semibold flex items-center gap-1">
+              <i data-lucide="shield-check" class="w-4 h-4"></i> Anti-Boncos
+            </span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- TAB 2: MANAJEMEN WO & LAPANGAN (PM WORKSPACE)                 -->
+    <!-- ============================================================= -->
+    <div id="content-projects" class="tab-content hidden space-y-6">
+      
+      <!-- Filter Bar -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+        <div class="flex flex-wrap items-center gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Filter Klien</label>
+            <select id="filter-client" onchange="loadProjects()" class="text-xs border border-slate-300 rounded-lg px-3 py-1.5 bg-slate-50 font-medium">
+              <option value="All">Semua Klien (Telkom, Icon+, ID Net)</option>
+              <option value="Telkom Akses">Telkom Akses</option>
+              <option value="Icon Net (PLN)">Icon Net (PLN)</option>
+              <option value="ID Net">ID Net</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Tipe Eksekutor</label>
+            <select id="filter-executor" onchange="loadProjects()" class="text-xs border border-slate-300 rounded-lg px-3 py-1.5 bg-slate-50 font-medium">
+              <option value="All">Semua Eksekutor</option>
+              <option value="Internal">Tim Internal Vendor</option>
+              <option value="Mandor">Mandor / Subkon</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Status Proyek</label>
+            <select id="filter-status" onchange="loadProjects()" class="text-xs border border-slate-300 rounded-lg px-3 py-1.5 bg-slate-50 font-medium">
+              <option value="All">Semua Status</option>
+              <option value="In-Progress">Sedang Berjalan</option>
+              <option value="Blocked">Terkendala (Blocked)</option>
+              <option value="Done">Selesai</option>
+              <option value="To-Do">Belum Dimulai</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <button onclick="openModal('modalAddProject')" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 shadow">
+            <i data-lucide="plus" class="w-4 h-4"></i> Tambah Work Order Baru
+          </button>
+        </div>
+      </div>
+
+      <!-- Projects Container -->
+      <div id="projects-container" class="space-y-6">
+        <!-- Dynamically populated project cards with 4 milestone cards -->
+      </div>
+
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- TAB 3: KONTROL BOQ & DRUM KABEL                               -->
+    <!-- ============================================================= -->
+    <div id="content-boq" class="tab-content hidden space-y-6">
+      
+      <!-- Drum Cable Widget -->
+      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="font-bold text-base text-slate-900 flex items-center gap-2">
+              <i data-lucide="disc" class="w-5 h-5 text-sky-600"></i>
+              <span>Manajemen Drum Kabel Fiber Optik (Cegah Waste)</span>
+            </h2>
+            <p class="text-xs text-slate-500">Pelacakan sisa meteran kabel pada drum teralokasi agar tidak ada potongan pendek yang terbuang percuma.</p>
+          </div>
+        </div>
+
+        <div id="drums-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- Dynamically populated drums -->
+        </div>
+      </div>
+
+      <!-- BOQ Explorer by Project -->
+      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <h2 class="font-bold text-base text-slate-900 flex items-center gap-2">
+              <i data-lucide="file-spreadsheet" class="w-5 h-5 text-emerald-600"></i>
+              <span>Detail BOQ & Komparasi Rencana vs Realisasi</span>
+            </h2>
+            <p class="text-xs text-slate-500">Pilih proyek untuk melihat rincian BOQ Material & Jasa, harga kontrak klien, dan biaya borongan mandor.</p>
+          </div>
+          <div>
+            <select id="boq-project-select" onchange="loadBOQForSelectedProject()" class="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 font-medium">
+              <!-- Dynamically populated -->
+            </select>
+          </div>
+        </div>
+
+        <!-- BOQ Summary & Table -->
+        <div id="boq-detail-container" class="overflow-x-auto">
+          <!-- Dynamically populated BOQ Table -->
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- TAB 4: KEUANGAN & CASHFLOW 2 ARAH                             -->
+    <!-- ============================================================= -->
+    <div id="content-finance" class="tab-content hidden space-y-6">
+
+      <!-- Navigation Inflow vs Outflow -->
+      <div class="flex border-b border-slate-200 gap-4">
+        <button onclick="switchFinanceSubTab('inflow')" id="btn-sub-inflow" class="pb-3 text-sm font-bold border-b-2 border-sky-600 text-sky-600 flex items-center gap-2">
+          <i data-lucide="arrow-down-left" class="w-4 h-4"></i>
+          <span>Jalur Kas Masuk (Tagihan SP/Invoice Klien)</span>
+        </button>
+        <button onclick="switchFinanceSubTab('outflow')" id="btn-sub-outflow" class="pb-3 text-sm font-medium text-slate-500 hover:text-slate-800 flex items-center gap-2">
+          <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+          <span>Jalur Kas Keluar (Upah Borongan Mandor)</span>
+        </button>
+      </div>
+
+      <!-- SUB-TAB 1: KAS MASUK (INFLOW) -->
+      <div id="sub-content-inflow" class="space-y-4">
+        <div class="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200">
+          <div>
+            <h3 class="font-bold text-slate-900 text-sm">Daftar Tagihan & Status Pembayaran Klien</h3>
+            <p class="text-xs text-slate-500">Monitoring pengajuan BAST, nomor SP Telkom Akses, tanggal faktur, dan konfirmasi pelunasan.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="exportInvoicesCSV()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 border border-slate-700 transition">
+              <i data-lucide="download" class="w-4 h-4"></i> Ekspor CSV
+            </button>
+            <button onclick="openModal('modalAddInvoice')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow">
+              <i data-lucide="plus" class="w-4 h-4"></i> Buat Tagihan Termin
+            </button>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold">
+              <tr>
+                <th class="p-3">ID Invoice / SP</th>
+                <th class="p-3">Klien</th>
+                <th class="p-3">Nomor WO</th>
+                <th class="p-3">Termin</th>
+                <th class="p-3 text-right">Nominal (Rp)</th>
+                <th class="p-3">Status</th>
+                <th class="p-3">Tgl Invoice</th>
+                <th class="p-3">Jatuh Tempo</th>
+                <th class="p-3">Aging Group</th>
+                <th class="p-3 text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="invoices-table-body" class="divide-y divide-slate-100">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SUB-TAB 2: KAS KELUAR (OUTFLOW - MANDOR PAYOUT) -->
+      <div id="sub-content-outflow" class="hidden space-y-4">
+        <div class="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3">
+          <i data-lucide="shield-alert" class="w-5 h-5 text-amber-600 mt-0.5"></i>
+          <div>
+            <h4 class="font-bold text-amber-800 text-sm">SOP Penguncian Kas Keluar (Anti-Boncos)</h4>
+            <p class="text-xs text-amber-700 mt-0.5">Upah mandor <b>HANYA DAPAT DICATAT LUNAS</b> apabila Project Manager (PM) telah memverifikasi bahwa titik fisik pekerjaan di lapangan (Tiang / KU / ODP) berstatus <span class="bg-emerald-100 text-emerald-800 px-1 py-0.5 rounded font-bold">Done</span>.</p>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold">
+              <tr>
+                <th class="p-3">ID Klaim</th>
+                <th class="p-3">Nama Mandor</th>
+                <th class="p-3">Nomor WO</th>
+                <th class="p-3">Tahap Lapangan</th>
+                <th class="p-3 text-right">Nominal Upah (Rp)</th>
+                <th class="p-3">Verifikasi PM</th>
+                <th class="p-3">Status Pembayaran</th>
+                <th class="p-3">Catatan PM</th>
+                <th class="p-3 text-center">Aksi Otorisasi</th>
+              </tr>
+            </thead>
+            <tbody id="mandor-payouts-table-body" class="divide-y divide-slate-100">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- TAB 5: MASTER EKSEKUTOR                                       -->
+    <!-- ============================================================= -->
+    <div id="content-executors" class="tab-content hidden space-y-6">
+      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex justify-between items-center mb-6">
+          <div>
+            <h2 class="font-bold text-base text-slate-900 flex items-center gap-2">
+              <i data-lucide="users" class="w-5 h-5 text-sky-600"></i>
+              <span>Direktori Tim Internal & Mitra Mandor Borongan</span>
+            </h2>
+            <p class="text-xs text-slate-500">Daftar eksekutor lapangan, kontak koordinator/mandor, standar tarif upah, dan performa.</p>
+          </div>
+          <button id="btnAddExecutor" onclick="openModal('modalEditExecutor'); resetExecutorForm();" class="hidden bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-4 py-2 rounded-lg items-center gap-1.5 shadow">
+            <i data-lucide="user-plus" class="w-4 h-4"></i> Tambah Eksekutor
+          </button>
+        </div>
+
+        <div id="executors-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- TAB 6: MANAJEMEN USER (SUPER ADMIN)                           -->
+    <!-- ============================================================= -->
+    <div id="content-users" class="tab-content hidden space-y-6">
+      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+        <div class="flex justify-between items-center mb-6">
+          <div>
+            <h2 class="font-bold text-base text-slate-900 flex items-center gap-2">
+              <i data-lucide="shield" class="w-5 h-5 text-sky-600"></i>
+              <span>Manajemen Akses User</span>
+            </h2>
+            <p class="text-xs text-slate-500">Buat user baru, atur role, atau reset password.</p>
+          </div>
+          <button onclick="openModal('modalAddUser')" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 shadow">
+            <i data-lucide="user-plus" class="w-4 h-4"></i> Tambah User Baru
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold">
+              <tr>
+                <th class="p-3">Nama Lengkap</th>
+                <th class="p-3">Username</th>
+                <th class="p-3">Role</th>
+                <th class="p-3 text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="users-table-body" class="divide-y divide-slate-100">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- TAB 7: GALLERY MANAGEMENT (SUPER ADMIN)                       -->
+    <!-- ============================================================= -->
+    <div id="content-gallery-mgmt" class="tab-content hidden space-y-6">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <div>
+          <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <i data-lucide="image" class="w-5 h-5 text-sky-600"></i> Manajemen Galeri Landing Page (Index)
+          </h2>
+          <p class="text-xs text-slate-500 mt-1">Super Admin dapat menambah, mengunggah, mengedit, atau menghapus foto dokumentasi yang tampil di halaman beranda (index.html).</p>
+        </div>
+        <button onclick="openModal('modalAddGallery')" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow transition flex items-center gap-2">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i> Upload Foto Baru
+        </button>
+      </div>
+
+      <!-- Gallery Grid in Dashboard -->
+      <div id="gallery-mgmt-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <!-- Rendered by app.js -->
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ============================================================= -->
+  <!-- MODAL 1: TAMBAH WORK ORDER (WO) BARU                          -->
+  <!-- ============================================================= -->
+  <div id="modalAddProject" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+        <h3 class="font-bold text-slate-900 text-lg flex items-center gap-2">
+          <i data-lucide="folder-plus" class="w-5 h-5 text-sky-600"></i>
+          <span>Input Work Order (WO / SP) Baru</span>
+        </h3>
+        <button onclick="closeModal('modalAddProject')" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="formAddProject" onsubmit="submitNewProject(event)" class="space-y-4 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Klien Utama *</label>
+          <select id="modal-client" required class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50">
+            <option value="Telkom Akses">Telkom Akses (Surat Pesanan / SP)</option>
+            <option value="Icon Net (PLN)">Icon Net (PLN Icon Plus)</option>
+            <option value="ID Net">ID Net</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Nomor SP / WO *</label>
+            <input type="text" id="modal-wo" required placeholder="Contoh: SP-TA-JKT-2026-0901" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Nama Klaster / STO / Relasi *</label>
+            <input type="text" id="modal-cluster" required placeholder="Contoh: STO Gambir - Klaster Petojo" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          </div>
+        </div>
+
+        <!-- PILIHAN EKSEKUTOR (REVISI PENTING) -->
+        <div class="p-3.5 bg-sky-50/70 rounded-xl border border-sky-200 space-y-3">
+          <label class="block font-bold text-sky-950 uppercase tracking-wider text-[11px]">
+            ⚡ Alokasi Eksekutor Proyek *
+          </label>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="flex items-center space-x-2 bg-white p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:border-sky-500">
+              <input type="radio" name="modal_executor_type" value="Internal" onchange="toggleExecutorSelect()" class="text-sky-600">
+              <span class="font-semibold text-slate-800">Tim Internal Vendor</span>
+            </label>
+            <label class="flex items-center space-x-2 bg-white p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:border-sky-500">
+              <input type="radio" name="modal_executor_type" value="Mandor" checked onchange="toggleExecutorSelect()" class="text-sky-600">
+              <span class="font-semibold text-slate-800">Mandor / Subkon</span>
+            </label>
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Pilih Eksekutor Terdaftar *</label>
+            <select id="modal-executor-id" required class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white">
+              <!-- Dynamically populated from executors -->
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Nilai Kontrak Klien (Rp) *</label>
+            <input type="number" id="modal-contract-value" required placeholder="350000000" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Estimasi Biaya Upah/HPP (Rp) *</label>
+            <input type="number" id="modal-mandor-cost" required placeholder="185000000" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Target Tanggal Selesai *</label>
+          <input type="date" id="modal-target-date" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
+        </div>
+
+        <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('modalAddProject')" class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
+          <button type="submit" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow">Simpan Work Order</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- MODAL 2: UPDATE MILESTONE LAPANGAN                            -->
+  <!-- ============================================================= -->
+  <div id="modalUpdateMilestone" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+        <div>
+          <h3 id="modal-m-stage" class="font-bold text-slate-900 text-base">Update Status Milestone</h3>
+          <p id="modal-m-project" class="text-xs text-slate-500">Nomor Proyek</p>
+        </div>
+        <button onclick="closeModal('modalUpdateMilestone')" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="formUpdateMilestone" onsubmit="submitUpdateMilestone(event)" class="space-y-4 text-xs">
+        <input type="hidden" id="modal-m-id">
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Status Pengerjaan *</label>
+          <select id="modal-m-status" onchange="toggleBlockedReasonField()" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 font-medium">
+            <option value="To-Do">To-Do (Abu-abu: Belum Dikerjakan)</option>
+            <option value="In-Progress">In-Progress (Biru: Sedang Dikerjakan)</option>
+            <option value="Blocked">Blocked (Merah: Terkendala Izin/Warga/Material)</option>
+            <option value="Done">Done (Hijau: Selesai & Terverifikasi PM)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Persentase Progres (%)</label>
+          <input type="number" id="modal-m-progress" min="0" max="100" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+        </div>
+
+        <div id="field-blocked-reason" class="hidden">
+          <label class="block font-semibold text-red-700 mb-1">Detail Kendala Lapangan (Blocked Reason) *</label>
+          <textarea id="modal-m-blocked" rows="2" placeholder="Contoh: Perizinan crossing rel KAI belum keluar..." class="w-full border border-red-300 bg-red-50/50 rounded-lg px-3 py-2"></textarea>
+        </div>
+
+        <!-- Khusus Stage Testing ATP: Input Loss OTDR & Redaman OPM -->
+        <div id="field-atp-test" class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2 hidden">
+          <span class="font-bold text-slate-800 block text-[11px]">Hasil Uji Terima (ATP Klien):</span>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-slate-600 mb-0.5">Loss OTDR (dB/km)</label>
+              <input type="text" id="modal-m-otdr" placeholder="Misal: 0.21 dB/km" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white">
+            </div>
+            <div>
+              <label class="block text-slate-600 mb-0.5">Redaman OPM (dBm)</label>
+              <input type="text" id="modal-m-opm" placeholder="Misal: -18.5 dBm" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white">
+            </div>
+          </div>
+          <p class="text-[10px] text-slate-500">Standar Telkom: -16 s/d -24 dBm.</p>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Catatan Lapangan PM</label>
+          <textarea id="modal-m-notes" rows="2" placeholder="Update progres fisik terkini..." class="w-full border border-slate-300 rounded-lg px-3 py-2"></textarea>
+        </div>
+
+        <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('modalUpdateMilestone')" class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
+          <button type="submit" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow">Simpan Perubahan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- MODAL 3: TAMBAH TAGIHAN TERMIN / INVOICE                      -->
+  <!-- ============================================================= -->
+  <div id="modalAddInvoice" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+        <h3 class="font-bold text-slate-900 text-base">Buat Tagihan Termin Baru</h3>
+        <button onclick="closeModal('modalAddInvoice')" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="formAddInvoice" onsubmit="submitNewInvoice(event)" class="space-y-4 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Pilih Work Order *</label>
+          <select id="modal-inv-project" onchange="autoFillInvoiceProjectInfo()" required class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50">
+            <!-- Dynamically populated -->
+          </select>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Nama Termin / Deskripsi *</label>
+          <input type="text" id="modal-inv-term" required placeholder="Contoh: Termin 2: Progres Lapangan 70%" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Nominal Tagihan (Rp) *</label>
+          <input type="number" id="modal-inv-amount" required placeholder="125000000" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Tanggal Invoice *</label>
+            <input type="date" id="modal-inv-date" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Jatuh Tempo *</label>
+            <input type="date" id="modal-inv-due" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          </div>
+        </div>
+
+        <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('modalAddInvoice')" class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
+          <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold shadow">Terbitkan Tagihan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- MODAL: TAMBAH USER BARU                                       -->
+  <!-- ============================================================= -->
+  <div id="modalAddUser" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+        <h3 class="font-bold text-slate-900 text-lg flex items-center gap-2">
+          <i data-lucide="user-plus" class="w-5 h-5 text-sky-600"></i>
+          <span>Tambah User Baru</span>
+        </h3>
+        <button onclick="closeModal('modalAddUser')" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form id="formAddUser" onsubmit="submitNewUser(event)" class="space-y-4 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Nama Lengkap *</label>
+          <input type="text" id="modal-user-name" required placeholder="Contoh: Budi Santoso" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Username *</label>
+          <input type="text" id="modal-user-username" required placeholder="Contoh: budi_pm" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Password *</label>
+          <input type="text" id="modal-user-password" required placeholder="Password sementara" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Role *</label>
+          <select id="modal-user-role" required class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white">
+            <option value="pm">Project Manager (Admin Ops)</option>
+            <option value="finance">Admin Finance (Keuangan)</option>
+            <option value="direktur">Direktur (Executive)</option>
+          </select>
+        </div>
+        <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('modalAddUser')" class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
+          <button type="submit" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- MODAL: RESET PASSWORD                                         -->
+  <!-- ============================================================= -->
+  <div id="modalResetPassword" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+        <h3 class="font-bold text-slate-900 text-lg flex items-center gap-2">
+          <i data-lucide="key" class="w-5 h-5 text-amber-600"></i>
+          <span>Reset Password</span>
+        </h3>
+        <button onclick="closeModal('modalResetPassword')" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form id="formResetPassword" onsubmit="submitResetPassword(event)" class="space-y-4 text-xs">
+        <input type="hidden" id="modal-reset-user-id">
+        <p class="text-slate-600">Masukkan password baru untuk user: <b id="modal-reset-username" class="text-slate-900"></b></p>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Password Baru *</label>
+          <input type="text" id="modal-reset-new-password" required placeholder="Password baru" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+        </div>
+        <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('modalResetPassword')" class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
+          <button type="submit" class="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-semibold shadow">Update Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- MODAL: EDIT / TAMBAH EKSEKUTOR                                -->
+  <!-- ============================================================= -->
+  <div id="modalEditExecutor" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+        <h3 class="font-bold text-slate-900 text-lg flex items-center gap-2">
+          <i data-lucide="edit" class="w-5 h-5 text-sky-600"></i>
+          <span id="executorModalTitle">Data Eksekutor</span>
+        </h3>
+        <button onclick="closeModal('modalEditExecutor')" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form id="formEditExecutor" onsubmit="submitExecutor(event)" class="space-y-4 text-xs">
+        <input type="hidden" id="modal-exec-id">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Nama Tim / Mandor *</label>
+          <input type="text" id="modal-exec-name" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Tipe Eksekutor *</label>
+          <select id="modal-exec-type" required class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white">
+            <option value="Internal">Tim Internal</option>
+            <option value="Mandor">Mandor / Subkon</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Nomor Telepon *</label>
+            <input type="text" id="modal-exec-phone" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Nomor Armada / Plat</label>
+            <input type="text" id="modal-exec-fleet" class="w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="Contoh: B-1234-XYZ">
+          </div>
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Standar Tarif / Upah</label>
+          <textarea id="modal-exec-rates" rows="3" class="w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="Contoh: Tiang: Rp 65.000/btg"></textarea>
+        </div>
+        <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('modalEditExecutor')" class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
+          <button type="submit" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: TAMBAH FOTO GALERI (SUPER ADMIN) -->
+  <div id="modalAddGallery" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+          <i data-lucide="image-plus" class="w-5 h-5 text-sky-600"></i> Upload Foto Galeri Index
+        </h3>
+        <button onclick="closeModal('modalAddGallery')" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="formAddGallery" onsubmit="submitNewGallery(event)" class="space-y-4 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Judul Aktivitas / Foto *</label>
+          <input type="text" id="modal-gal-title" required placeholder="Contoh: Penanaman Tiang Area Sentul" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-sky-500">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Pilihan Kategori Foto *</label>
+          <select id="modal-gal-category" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-slate-50 font-medium focus:ring-2 focus:ring-sky-500">
+            <option value="lapangan">Konstruksi & OSP (Penanaman Tiang, Tarik Kabel, Box ODP)</option>
+            <option value="splicing">Splicing & ODC (Penyambungan Core, Server Rack)</option>
+            <option value="qc">Pengujian & QC (Ukur OTDR, OPM, Validasi BAST)</option>
+            <option value="k3">K3 & Safety Briefing (Toolbox Meeting, APD)</option>
+            <option value="armada">Armada & Gudang (Mobil Operasional, Stok Drum)</option>
+            <option value="manajemen">Tim & Manajemen (Koordinasi PM, Keluarga PT AKU)</option>
+            <option value="refreshing">Kegiatan Refreshing (Gathering, Outing, Rekreasi Tim)</option>
+          </select>
+          <p class="text-[10px] text-slate-400 mt-1">Kategori ini menentukan tombol filter di galeri halaman index.</p>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Deskripsi Singkat</label>
+          <input type="text" id="modal-gal-desc" placeholder="Contoh: Tim Bravo menyelesaikan 20 titik ODP" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-sky-500">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Pilih File Foto (JPG/PNG) *</label>
+          <input type="file" id="modal-gal-file" accept="image/*" onchange="previewGalleryImage(event)" required class="w-full border border-slate-300 rounded-lg p-2 text-xs bg-slate-50 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100">
+          
+          <!-- Image Live Preview -->
+          <div id="gal-preview-container" class="mt-2 hidden rounded-xl overflow-hidden border border-slate-200 bg-slate-100 p-1 flex items-center justify-center max-h-48">
+            <img id="gal-preview-img" src="" alt="Pratinjau Foto" class="max-h-44 object-contain rounded-lg">
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('modalAddGallery')" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition">
+            Batal
+          </button>
+          <button type="submit" id="btnSubmitGallery" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-bold shadow transition flex items-center gap-1.5">
+            <i data-lucide="upload" class="w-4 h-4"></i> Upload & Publikasikan
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL EDIT FOTO GALERI (SUPER ADMIN ONLY) -->
+  <div id="modalEditGallery" class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+          <i data-lucide="edit" class="w-5 h-5 text-sky-600"></i> Edit Detail Foto Galeri
+        </h3>
+        <button onclick="closeModal('modalEditGallery')" class="text-slate-400 hover:text-slate-600">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="formEditGallery" onsubmit="submitEditGallery(event)" class="space-y-4 text-xs">
+        <input type="hidden" id="modal-edit-gal-id">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Judul Aktivitas / Foto *</label>
+          <input type="text" id="modal-edit-gal-title" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-sky-500">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Pilihan Kategori Foto *</label>
+          <select id="modal-edit-gal-category" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-slate-50 font-medium focus:ring-2 focus:ring-sky-500">
+            <option value="lapangan">Konstruksi & OSP (Penanaman Tiang, Tarik Kabel, Box ODP)</option>
+            <option value="splicing">Splicing & ODC (Penyambungan Core, Server Rack)</option>
+            <option value="qc">Pengujian & QC (Ukur OTDR, OPM, Validasi BAST)</option>
+            <option value="k3">K3 & Safety Briefing (Toolbox Meeting, APD)</option>
+            <option value="armada">Armada & Gudang (Mobil Operasional, Stok Drum)</option>
+            <option value="manajemen">Tim & Manajemen (Koordinasi PM, Keluarga PT AKU)</option>
+            <option value="refreshing">Kegiatan Refreshing (Gathering, Outing, Rekreasi Tim)</option>
+          </select>
+          <p class="text-[10px] text-slate-400 mt-1">Kategori ini menentukan tombol filter di galeri halaman index.</p>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Deskripsi Singkat</label>
+          <input type="text" id="modal-edit-gal-desc" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-sky-500">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Ganti File Foto (Opsional, biarkan kosong jika tetap)</label>
+          <input type="file" id="modal-edit-gal-file" accept="image/*" onchange="previewEditGalleryImage(event)" class="w-full border border-slate-300 rounded-lg p-2 text-xs bg-slate-50 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100">
+          
+          <!-- Image Live Preview -->
+          <div id="gal-edit-preview-container" class="mt-2 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 p-1 flex items-center justify-center max-h-48">
+            <img id="gal-edit-preview-img" src="" alt="Pratinjau Foto" class="max-h-44 object-contain rounded-lg">
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('modalEditGallery')" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition">
+            Batal
+          </button>
+          <button type="submit" id="btnSubmitEditGallery" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-bold shadow transition flex items-center gap-1.5">
+            <i data-lucide="check" class="w-4 h-4"></i> Simpan Perubahan
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="bg-slate-900 border-t border-slate-800 text-slate-400 text-xs py-4 px-4 text-center mt-auto">
+    <p>PT Akses Kwalitas Unggul &copy; 2026 • Sistem Monitoring Pekerjaan & Keuangan Vendor FTTH • Khusus Telkom Akses, Icon Net, & ID Net</p>
+  </footer>
+
+  <!-- Frontend Logic Script -->
+  <script src="/app.js"></script>
+</body>
+</html>
