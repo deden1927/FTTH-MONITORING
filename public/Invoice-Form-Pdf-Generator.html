@@ -39,8 +39,24 @@
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
 
+    @page {
+      size: A4 portrait;
+      margin: 0; /* Menghilangkan otomatis header browser (title & date) serta footer (URL & page numbers) */
+    }
+
     /* Print Styles */
     @media print {
+      @page {
+        size: A4 portrait;
+        margin: 0mm; /* Menghilangkan otomatis header browser (title & date) serta footer (URL & page numbers) */
+      }
+      html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
       body * {
         visibility: hidden;
       }
@@ -51,11 +67,13 @@
         position: absolute;
         left: 0;
         top: 0;
-        width: 100% !important;
-        margin: 0 !important;
-        padding: 0 !important;
+        width: 210mm !important;
+        min-height: 297mm !important;
+        margin: 0 auto !important;
+        padding: 12mm 15mm !important;
         border: none !important;
         box-shadow: none !important;
+        background: #ffffff !important;
       }
       .no-print {
         display: none !important;
@@ -375,7 +393,12 @@
       };
 
       const handlePrint = () => {
+        const originalTitle = document.title;
+        document.title = " "; // Kosongkan title agar header browser tidak menampilkan teks judul
         window.print();
+        setTimeout(() => {
+          document.title = originalTitle;
+        }, 1500);
       };
 
       return (
