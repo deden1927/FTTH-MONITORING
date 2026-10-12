@@ -6,6 +6,11 @@
   <title>Invoice Form & PDF Generator | PT Akses Kwalitas Unggul</title>
   <link rel="icon" type="image/png" href="/images/logo.png">
   
+  <!-- Google Fonts: Inter & Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   
@@ -24,6 +29,16 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <style>
+    * {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
     /* Print Styles */
     @media print {
       body * {
@@ -47,15 +62,25 @@
       }
     }
 
-    /* Excel-like borders and typography */
+    /* Modern Typography & Excel-like Borders */
+    .a4-sheet, .excel-table {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+    }
+
     .excel-table {
       border-collapse: collapse;
       width: 100%;
-      font-family: Arial, Helvetica, sans-serif;
+      letter-spacing: 0.1px;
     }
     .excel-table td, .excel-table th {
-      border: 1px solid #000000;
-      color: #000000;
+      border: 1px solid #0f172a;
+      color: #0f172a;
+    }
+
+    .num-cell {
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: 'tnum';
+      letter-spacing: 0.25px;
     }
 
     /* Watermark text styling */
@@ -64,26 +89,26 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      font-size: 85px;
+      font-size: 80px;
       font-weight: 800;
-      color: rgba(148, 163, 184, 0.22);
+      color: rgba(148, 163, 184, 0.16);
       pointer-events: none;
       user-select: none;
       z-index: 1;
-      font-family: Arial, Helvetica, sans-serif;
-      letter-spacing: 2px;
+      font-family: 'Inter', sans-serif;
+      letter-spacing: 4px;
     }
 
-    /* Fixed A4 Page styling for high-res snapshot */
+    /* Fixed A4 Page styling with 1:1 Aspect Ratio (210mm x 297mm) */
     .a4-sheet {
       width: 794px;
-      min-height: 1120px;
+      min-height: 1123px;
       background: #ffffff;
-      color: #000000;
+      color: #0f172a;
       margin: 0 auto;
       box-sizing: border-box;
       position: relative;
-      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.5;
     }
   </style>
 </head>
@@ -290,31 +315,50 @@
           const element = invoiceRef.current;
           if (!element) return;
 
-          // Snapshot with html2canvas (Scale 2 for high quality sharpness)
+          // Snapshot with html2canvas (Scale 2.5, exact element boundaries without windowWidth distortion)
           const canvas = await html2canvas(element, {
-            scale: 2,
+            scale: 2.5,
             useCORS: true,
             logging: false,
             backgroundColor: '#ffffff',
-            windowWidth: 1024
+            scrollY: 0,
+            scrollX: 0
           });
 
-          const imgData = canvas.toDataURL('image/jpeg', 0.98);
+          // PNG guarantees 100% crisp, lossless text and table lines
+          const imgData = canvas.toDataURL('image/png');
           const { jsPDF } = window.jspdf;
           
           // A4 dimensions in mm: 210 x 297
           const pdf = new jsPDF({
             orientation: 'portrait',
             unit: 'mm',
-            format: 'a4'
+            format: 'a4',
+            compress: true
           });
 
-          const pdfWidth = pdf.internal.pageSize.getWidth(); // 210mm
-          const pdfPageHeight = pdf.internal.pageSize.getHeight(); // 297mm
-          const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+          const pageWidth = 210;
+          const pageHeight = 297;
 
-          // Add image to PDF
-          pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, Math.min(imgHeight, pdfPageHeight));
+          // Preserve exact 1:1 aspect ratio (ANTI PENYET / NO STRETCH)
+          const contentWidth = pageWidth;
+          const contentHeight = (canvas.height * contentWidth) / canvas.width;
+
+          let renderW = contentWidth;
+          let renderH = contentHeight;
+          let posX = 0;
+          let posY = 0;
+
+          // If slightly taller than A4, scale down proportionally keeping exact aspect ratio
+          if (renderH > pageHeight) {
+            const fitRatio = pageHeight / renderH;
+            renderH = pageHeight;
+            renderW = renderW * fitRatio;
+            posX = (pageWidth - renderW) / 2;
+          }
+
+          // Add image to PDF with clean PNG rendering
+          pdf.addImage(imgData, 'PNG', posX, posY, renderW, renderH, undefined, 'FAST');
 
           // Clean filename
           const cleanNoInv = (formData.no_invoice || '001').replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -751,14 +795,15 @@
                   {/* 2. [JUDUL] Baris di bawahnya bertuliskan "INVOICE" di tengah, dengan border tabel 1px solid black. */}
                   <div 
                     style={{ 
-                      border: '1px solid #000000', 
+                      border: '1px solid #0f172a', 
                       textAlign: 'center', 
-                      padding: '7px 0', 
-                      fontWeight: 'bold', 
+                      padding: '8px 0', 
+                      fontWeight: '800', 
                       fontSize: '18px', 
-                      letterSpacing: '3px',
+                      letterSpacing: '4px',
                       backgroundColor: '#f8fafc',
-                      marginBottom: '10px'
+                      marginBottom: '12px',
+                      color: '#0f172a'
                     }}
                   >
                     INVOICE
@@ -766,7 +811,7 @@
 
                   {/* 3. [INFO PELANGGAN - 2 Kolom Tabel] */}
                   {/* Kolom Kiri: Kepada, Alamat, NPWP | Kolom Kanan: No Invoice, No Faktur Pajak, Tgl Invoice, No Perjanjian */}
-                  <table className="excel-table" style={{ marginBottom: '12px', fontSize: '11px' }}>
+                  <table className="excel-table" style={{ marginBottom: '14px', fontSize: '11.5px' }}>
                     <tbody>
                       <tr>
                         {/* Kolom Kiri (Lebar ~54%, rowspan 4 baris) */}
@@ -775,30 +820,30 @@
                           style={{ 
                             width: '54%', 
                             verticalAlign: 'top', 
-                            padding: '8px 10px',
-                            border: '1px solid #000000'
+                            padding: '10px 12px',
+                            border: '1px solid #0f172a'
                           }}
                         >
-                          <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', fontSize: '11px' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', fontSize: '11.5px' }}>
                             <tbody>
                               <tr>
-                                <td style={{ width: '65px', fontWeight: 'bold', verticalAlign: 'top', border: 'none', padding: '2px 0' }}>Kepada</td>
-                                <td style={{ width: '12px', verticalAlign: 'top', border: 'none', padding: '2px 0' }}>:</td>
-                                <td style={{ fontWeight: 'bold', verticalAlign: 'top', border: 'none', padding: '2px 0' }}>
+                                <td style={{ width: '65px', fontWeight: '700', verticalAlign: 'top', border: 'none', padding: '3px 0' }}>Kepada</td>
+                                <td style={{ width: '12px', verticalAlign: 'top', border: 'none', padding: '3px 0' }}>:</td>
+                                <td style={{ fontWeight: '700', verticalAlign: 'top', border: 'none', padding: '3px 0', color: '#0f172a' }}>
                                   {formData.kepada || '-'}
                                 </td>
                               </tr>
                               <tr>
-                                <td style={{ fontWeight: 'bold', verticalAlign: 'top', border: 'none', padding: '2px 0' }}>Alamat</td>
-                                <td style={{ verticalAlign: 'top', border: 'none', padding: '2px 0' }}>:</td>
-                                <td style={{ verticalAlign: 'top', border: 'none', padding: '2px 0', whiteSpace: 'pre-line', minHeight: '44px', lineHeight: '1.4' }}>
+                                <td style={{ fontWeight: '700', verticalAlign: 'top', border: 'none', padding: '3px 0' }}>Alamat</td>
+                                <td style={{ verticalAlign: 'top', border: 'none', padding: '3px 0' }}>:</td>
+                                <td style={{ verticalAlign: 'top', border: 'none', padding: '3px 0', whiteSpace: 'pre-line', minHeight: '44px', lineHeight: '1.5', color: '#334155' }}>
                                   {formData.alamat || '-'}
                                 </td>
                               </tr>
                               <tr>
-                                <td style={{ fontWeight: 'bold', verticalAlign: 'top', border: 'none', padding: '2px 0' }}>NPWP</td>
-                                <td style={{ verticalAlign: 'top', border: 'none', padding: '2px 0' }}>:</td>
-                                <td style={{ verticalAlign: 'top', border: 'none', padding: '2px 0' }}>
+                                <td style={{ fontWeight: '700', verticalAlign: 'top', border: 'none', padding: '3px 0' }}>NPWP</td>
+                                <td style={{ verticalAlign: 'top', border: 'none', padding: '3px 0' }}>:</td>
+                                <td className="num-cell" style={{ verticalAlign: 'top', border: 'none', padding: '3px 0', color: '#334155' }}>
                                   {formData.npwp || '-'}
                                 </td>
                               </tr>
@@ -807,34 +852,34 @@
                         </td>
 
                         {/* Kolom Kanan: 4 Baris */}
-                        <td style={{ width: '20%', fontWeight: 'bold', padding: '5px 8px', border: '1px solid #000000', backgroundColor: '#fafafa' }}>
+                        <td style={{ width: '20%', fontWeight: '700', padding: '6px 10px', border: '1px solid #0f172a', backgroundColor: '#f8fafc' }}>
                           No. Invoice
                         </td>
-                        <td style={{ width: '26%', padding: '5px 8px', border: '1px solid #000000', fontFamily: 'monospace', fontWeight: 'bold' }}>
+                        <td className="num-cell" style={{ width: '26%', padding: '6px 10px', border: '1px solid #0f172a', fontWeight: '700', color: '#0f172a' }}>
                           {formData.no_invoice || '-'}
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontWeight: 'bold', padding: '5px 8px', border: '1px solid #000000', backgroundColor: '#fafafa' }}>
+                        <td style={{ fontWeight: '700', padding: '6px 10px', border: '1px solid #0f172a', backgroundColor: '#f8fafc' }}>
                           No Faktur Pajak
                         </td>
-                        <td style={{ padding: '5px 8px', border: '1px solid #000000', fontFamily: 'monospace' }}>
+                        <td className="num-cell" style={{ padding: '6px 10px', border: '1px solid #0f172a', color: '#334155' }}>
                           {formData.no_faktur_pajak || '-'}
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontWeight: 'bold', padding: '5px 8px', border: '1px solid #000000', backgroundColor: '#fafafa' }}>
+                        <td style={{ fontWeight: '700', padding: '6px 10px', border: '1px solid #0f172a', backgroundColor: '#f8fafc' }}>
                           Tgl Invoice
                         </td>
-                        <td style={{ padding: '5px 8px', border: '1px solid #000000' }}>
+                        <td style={{ padding: '6px 10px', border: '1px solid #0f172a', color: '#334155' }}>
                           {formatDateIndo(formData.tgl_invoice)}
                         </td>
                       </tr>
                       <tr>
-                        <td style={{ fontWeight: 'bold', padding: '5px 8px', border: '1px solid #000000', backgroundColor: '#fafafa' }}>
+                        <td style={{ fontWeight: '700', padding: '6px 10px', border: '1px solid #0f172a', backgroundColor: '#f8fafc' }}>
                           No. Perjanjian
                         </td>
-                        <td style={{ padding: '5px 8px', border: '1px solid #000000', fontWeight: '600' }}>
+                        <td style={{ padding: '6px 10px', border: '1px solid #0f172a', fontWeight: '600', color: '#0f172a' }}>
                           {formData.no_perjanjian || '-'}
                         </td>
                       </tr>
@@ -842,23 +887,23 @@
                   </table>
 
                   {/* 4. [TABEL UTAMA - 3 Kolom: Item | Uraian | Jumlah] */}
-                  <div style={{ position: 'relative', marginBottom: '12px' }}>
+                  <div style={{ position: 'relative', marginBottom: '14px' }}>
                     
                     {/* Watermark text "Page 1" besar transparan di tengah tabel persis seperti di gambar */}
                     <div className="excel-watermark">
                       Page 1
                     </div>
 
-                    <table className="excel-table" style={{ fontSize: '11px', position: 'relative', zIndex: 2 }}>
+                    <table className="excel-table" style={{ fontSize: '11.5px', position: 'relative', zIndex: 2 }}>
                       <thead>
-                        <tr style={{ backgroundColor: '#f1f5f9', fontWeight: 'bold' }}>
-                          <th style={{ width: '45px', textAlign: 'center', padding: '7px 4px', border: '1px solid #000000' }}>
+                        <tr style={{ backgroundColor: '#f1f5f9', fontWeight: '700' }}>
+                          <th style={{ width: '45px', textAlign: 'center', padding: '8px 4px', border: '1px solid #0f172a' }}>
                             Item
                           </th>
-                          <th style={{ textAlign: 'center', padding: '7px 8px', border: '1px solid #000000' }}>
+                          <th style={{ textAlign: 'center', padding: '8px 10px', border: '1px solid #0f172a' }}>
                             Uraian
                           </th>
-                          <th style={{ width: '180px', textAlign: 'center', padding: '7px 8px', border: '1px solid #000000' }}>
+                          <th style={{ width: '190px', textAlign: 'center', padding: '8px 10px', border: '1px solid #0f172a' }}>
                             Jumlah
                           </th>
                         </tr>
@@ -866,49 +911,49 @@
                       <tbody>
                         {/* Baris Konten Pekerjaan Utama (Spacious Height dengan Watermark di tengah) */}
                         <tr style={{ minHeight: '260px' }}>
-                          <td style={{ textAlign: 'center', verticalAlign: 'top', padding: '12px 4px', border: '1px solid #000000', fontWeight: 'bold' }}>
+                          <td style={{ textAlign: 'center', verticalAlign: 'top', padding: '12px 4px', border: '1px solid #0f172a', fontWeight: '700' }}>
                             1
                           </td>
-                          <td style={{ verticalAlign: 'top', padding: '12px 10px', minHeight: '260px', height: '260px', border: '1px solid #000000' }}>
-                            <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>PEKERJAAN :</div>
+                          <td style={{ verticalAlign: 'top', padding: '12px 10px', minHeight: '260px', height: '260px', border: '1px solid #0f172a' }}>
+                            <div style={{ fontWeight: '800', marginBottom: '6px', color: '#0f172a' }}>PEKERJAAN :</div>
                             <div style={{ whiteSpace: 'pre-line', lineHeight: '1.6', color: '#1e293b' }}>
                               {formData.pekerjaan || '-'}
                             </div>
                           </td>
-                          <td style={{ verticalAlign: 'top', padding: '12px 10px', border: '1px solid #000000', textAlign: 'right' }}>
+                          <td style={{ verticalAlign: 'top', padding: '12px 10px', border: '1px solid #0f172a', textAlign: 'right' }}>
                             {/* Kosong di area deskripsi pekerjaan */}
                           </td>
                         </tr>
 
                         {/* Baris TOTAL */}
                         <tr>
-                          <td style={{ border: '1px solid #000000' }}></td>
-                          <td style={{ fontWeight: 'bold', padding: '6px 10px', border: '1px solid #000000', textAlign: 'right' }}>
+                          <td style={{ border: '1px solid #0f172a' }}></td>
+                          <td style={{ fontWeight: '700', padding: '7px 10px', border: '1px solid #0f172a', textAlign: 'right' }}>
                             TOTAL
                           </td>
-                          <td style={{ fontWeight: 'bold', padding: '6px 10px', border: '1px solid #000000', textAlign: 'right', fontFamily: 'monospace', fontSize: '12px' }}>
+                          <td className="num-cell" style={{ fontWeight: '700', padding: '7px 10px', border: '1px solid #0f172a', textAlign: 'right', fontSize: '12px' }}>
                             {totalNum > 0 ? formatRupiah(totalNum) : 'Rp 0,-'}
                           </td>
                         </tr>
 
                         {/* Baris PPN */}
                         <tr>
-                          <td style={{ border: '1px solid #000000' }}></td>
-                          <td style={{ fontWeight: 'bold', padding: '6px 10px', border: '1px solid #000000', textAlign: 'right' }}>
+                          <td style={{ border: '1px solid #0f172a' }}></td>
+                          <td style={{ fontWeight: '700', padding: '7px 10px', border: '1px solid #0f172a', textAlign: 'right' }}>
                             PPN {ppnPercentNum}%
                           </td>
-                          <td style={{ fontWeight: 'bold', padding: '6px 10px', border: '1px solid #000000', textAlign: 'right', fontFamily: 'monospace', fontSize: '12px' }}>
+                          <td className="num-cell" style={{ fontWeight: '700', padding: '7px 10px', border: '1px solid #0f172a', textAlign: 'right', fontSize: '12px' }}>
                             {totalNum > 0 ? formatRupiah(ppnNominal) : 'Rp 0,-'}
                           </td>
                         </tr>
 
                         {/* Baris NILAI TAGIHAN */}
                         <tr style={{ backgroundColor: '#f8fafc' }}>
-                          <td style={{ border: '1px solid #000000' }}></td>
-                          <td style={{ fontWeight: 'bold', padding: '7px 10px', border: '1px solid #000000', textAlign: 'right', letterSpacing: '0.5px' }}>
+                          <td style={{ border: '1px solid #0f172a' }}></td>
+                          <td style={{ fontWeight: '800', padding: '8px 10px', border: '1px solid #0f172a', textAlign: 'right', letterSpacing: '0.3px' }}>
                             NILAI TAGIHAN
                           </td>
-                          <td style={{ fontWeight: 'bold', padding: '7px 10px', border: '1px solid #000000', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#0f172a' }}>
+                          <td className="num-cell" style={{ fontWeight: '800', padding: '8px 10px', border: '1px solid #0f172a', textAlign: 'right', fontSize: '13px', color: '#0f172a' }}>
                             {totalNum > 0 ? formatRupiah(nilaiTagihan) : 'Rp 0,-'}
                           </td>
                         </tr>
@@ -918,14 +963,14 @@
                           <td 
                             colSpan={3} 
                             style={{ 
-                              padding: '8px 10px', 
-                              border: '1px solid #000000', 
+                              padding: '9px 10px', 
+                              border: '1px solid #0f172a', 
                               backgroundColor: '#ffffff'
                             }}
                           >
-                            <span style={{ fontWeight: 'bold' }}>TERBILANG : </span>
+                            <span style={{ fontWeight: '800', marginRight: '6px' }}>TERBILANG :</span>
                             {totalNum > 0 ? (
-                              <span style={{ fontStyle: 'italic', fontWeight: 'bold', textDecoration: 'underline' }}>
+                              <span style={{ fontStyle: 'italic', fontWeight: '700', textDecoration: 'underline', color: '#0f172a' }}>
                                 # {terbilangText} #
                               </span>
                             ) : (
@@ -939,27 +984,27 @@
 
                   {/* 5. [FOOTER] */}
                   {/* Kiri Bawah: Nama Bank, No Rekening, Nama PT | Kanan Bawah: Kotak Tanda Tangan */}
-                  <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginTop: '10px', fontSize: '11px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginTop: '12px', fontSize: '11.5px' }}>
                     <tbody>
                       <tr>
                         {/* Kiri Bawah: Info Rekening Pembayaran */}
                         <td style={{ width: '60%', verticalAlign: 'top', border: 'none', padding: '4px 6px' }}>
-                          <table style={{ borderCollapse: 'collapse', border: 'none', fontSize: '11px' }}>
+                          <table style={{ borderCollapse: 'collapse', border: 'none', fontSize: '11.5px' }}>
                             <tbody>
                               <tr>
-                                <td style={{ width: '90px', fontWeight: 'bold', padding: '2px 0', border: 'none' }}>Nama Bank</td>
-                                <td style={{ width: '10px', padding: '2px 0', border: 'none' }}>:</td>
-                                <td style={{ fontWeight: 'bold', padding: '2px 0', border: 'none' }}>{formData.bank_name || 'Bank BNI'}</td>
+                                <td style={{ width: '90px', fontWeight: '700', padding: '2.5px 0', border: 'none' }}>Nama Bank</td>
+                                <td style={{ width: '10px', padding: '2.5px 0', border: 'none' }}>:</td>
+                                <td style={{ fontWeight: '700', padding: '2.5px 0', border: 'none', color: '#0f172a' }}>{formData.bank_name || 'Bank BNI'}</td>
                               </tr>
                               <tr>
-                                <td style={{ fontWeight: 'bold', padding: '2px 0', border: 'none' }}>No Rekening</td>
-                                <td style={{ padding: '2px 0', border: 'none' }}>:</td>
-                                <td style={{ fontWeight: 'bold', padding: '2px 0', border: 'none', fontFamily: 'monospace' }}>{formData.no_rekening || '5150005089'}</td>
+                                <td style={{ fontWeight: '700', padding: '2.5px 0', border: 'none' }}>No Rekening</td>
+                                <td style={{ padding: '2.5px 0', border: 'none' }}>:</td>
+                                <td className="num-cell" style={{ fontWeight: '700', padding: '2.5px 0', border: 'none', color: '#0f172a' }}>{formData.no_rekening || '5150005089'}</td>
                               </tr>
                               <tr>
-                                <td style={{ fontWeight: 'bold', padding: '2px 0', border: 'none' }}>Nama</td>
-                                <td style={{ padding: '2px 0', border: 'none' }}>:</td>
-                                <td style={{ fontWeight: 'bold', padding: '2px 0', border: 'none' }}>{formData.pemilik_rekening || 'PT AKSES KWALITAS UNGGUL'}</td>
+                                <td style={{ fontWeight: '700', padding: '2.5px 0', border: 'none' }}>Nama</td>
+                                <td style={{ padding: '2.5px 0', border: 'none' }}>:</td>
+                                <td style={{ fontWeight: '700', padding: '2.5px 0', border: 'none', color: '#0f172a' }}>{formData.pemilik_rekening || 'PT AKSES KWALITAS UNGGUL'}</td>
                               </tr>
                             </tbody>
                           </table>
@@ -976,7 +1021,7 @@
                             style={{ 
                               width: '210px', 
                               marginLeft: 'auto', 
-                              border: '1px solid #000000', 
+                              border: '1px solid #0f172a', 
                               boxSizing: 'border-box',
                               backgroundColor: '#ffffff'
                             }}
@@ -986,10 +1031,11 @@
                               style={{ 
                                 textAlign: 'center', 
                                 padding: '6px 0', 
-                                fontWeight: 'bold', 
-                                borderBottom: '1px solid #000000',
-                                fontSize: '11px',
-                                backgroundColor: '#f8fafc'
+                                fontWeight: '700', 
+                                borderBottom: '1px solid #0f172a',
+                                fontSize: '11.5px',
+                                backgroundColor: '#f8fafc',
+                                color: '#0f172a'
                               }}
                             >
                               Direktur Utama
@@ -1005,10 +1051,11 @@
                               style={{ 
                                 textAlign: 'center', 
                                 padding: '6px 0', 
-                                fontWeight: 'bold', 
-                                borderTop: '1px solid #000000',
-                                fontSize: '11px',
-                                textDecoration: 'underline'
+                                fontWeight: '700', 
+                                borderTop: '1px solid #0f172a',
+                                fontSize: '11.5px',
+                                textDecoration: 'underline',
+                                color: '#0f172a'
                               }}
                             >
                               {formData.nama_direktur || 'Suprapto'}
