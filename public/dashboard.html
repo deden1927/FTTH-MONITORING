@@ -452,7 +452,10 @@
             <button onclick="exportInvoicesCSV()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 border border-slate-700 transition">
               <i data-lucide="download" class="w-4 h-4"></i> Ekspor CSV
             </button>
-            <button onclick="openModal('modalAddInvoice')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow">
+            <a href="/Invoice-Form-Pdf-Generator.html" target="_blank" id="btnInvoicePdfGenerator" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow transition">
+              <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Generator PDF (Excel)
+            </a>
+            <button id="btnTambahInvoice" onclick="openModal('modalAddInvoice')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow">
               <i data-lucide="plus" class="w-4 h-4"></i> Buat Tagihan Termin
             </button>
           </div>

@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoice Form & PDF Generator | PT Akses Kwalitas Unggul</title>
+  <link rel="icon" type="image/png" href="/images/logo.png">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React 18 & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel for JSX compilation -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- html2canvas & jsPDF for PDF generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* Print Styles */
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #print-area, #print-area * {
+        visibility: visible;
+      }
+      #print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+
+    /* Excel-like borders and typography */
+    .excel-table {
+      border-collapse: collapse;
+      width: 100%;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .excel-table td, .excel-table th {
+      border: 1px solid #000000;
+      color: #000000;
+    }
+
+    /* Watermark text styling */
+    .excel-watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 85px;
+      font-weight: 800;
+      color: rgba(148, 163, 184, 0.22);
+      pointer-events: none;
+      user-select: none;
+      z-index: 1;
+      font-family: Arial, Helvetica, sans-serif;
+      letter-spacing: 2px;
+    }
+
+    /* Fixed A4 Page styling for high-res snapshot */
+    .a4-sheet {
+      width: 794px;
+      min-height: 1120px;
+      background: #ffffff;
+      color: #000000;
+      margin: 0 auto;
+      box-sizing: border-box;
+      position: relative;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // =========================================================
+    // 1. HELPER: TERBILANG INDONESIA (ANGKA -> KATA)
+    // =========================================================
+    function terbilangIndonesia(angka) {
+      angka = Math.floor(Math.abs(Number(angka) || 0));
+      if (angka === 0) return "Nol Rupiah";
+
+      const bilangan = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"];
+
+      function konversi(n) {
+        if (n < 12) {
+          return bilangan[n];
+        } else if (n < 20) {
+          return konversi(n - 10) + " Belas";
+        } else if (n < 100) {
+          return konversi(Math.floor(n / 10)) + " Puluh " + konversi(n % 10);
+        } else if (n < 200) {
+          return "Seratus " + konversi(n - 100);
+        } else if (n < 1000) {
+          return konversi(Math.floor(n / 100)) + " Ratus " + konversi(n % 100);
+        } else if (n < 2000) {
+          return "Seribu " + konversi(n - 1000);
+        } else if (n < 1000000) {
+          return konversi(Math.floor(n / 1000)) + " Ribu " + konversi(n % 1000);
+        } else if (n < 1000000000) {
+          return konversi(Math.floor(n / 1000000)) + " Juta " + konversi(n % 1000000);
+        } else if (n < 1000000000000) {
+          return konversi(Math.floor(n / 1000000000)) + " Milyar " + konversi(n % 1000000000);
+        } else if (n < 1000000000000000) {
+          return konversi(Math.floor(n / 1000000000000)) + " Triliun " + konversi(n % 1000000000000);
+        }
+        return "";
+      }
+
+      const hasil = konversi(angka).replace(/\s+/g, ' ').trim();
+      return (hasil ? hasil : "Nol") + " Rupiah";
+    }
+
+    // =========================================================
+    // 2. HELPER: FORMAT RUPIAH
+    // =========================================================
+    function formatRupiah(num) {
+      const n = Math.round(Number(num) || 0);
+      return 'Rp ' + n.toLocaleString('id-ID') + ',-';
+    }
+
+    // Format Tanggal Indonesia
+    function formatDateIndo(dateStr) {
+      if (!dateStr) return '-';
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+    }
+
+    // =========================================================
+    // 3. MAIN COMPONENT: InvoiceGeneratorApp
+    // =========================================================
+    function InvoiceGeneratorApp() {
+      // State default: 1, 2, 3 KOSONG, 4. Data dan Rekening TETAP TERISI
+      const cleanInitialState = {
+        // 1. Info Pelanggan & Klien (KOSONG)
+        kepada: "",
+        alamat: "",
+        npwp: "",
+        // 2. Identitas Faktur & Perjanjian (KOSONG)
+        no_invoice: "",
+        no_faktur_pajak: "",
+        tgl_invoice: "",
+        no_perjanjian: "",
+        // 3. Rincian Pekerjaan & Nominal (KOSONG)
+        pekerjaan: "",
+        total: "",
+        ppn_persen: 11,
+        // 4. Data dan Rekening (BIARKAN SEPERTI ITU)
+        bank_name: "Bank BNI",
+        no_rekening: "5150005089",
+        pemilik_rekening: "PT AKSES KWALITAS UNGGUL",
+        nama_direktur: "Suprapto",
+        showLogoInHeader: false, // Default kosong sesuai template Excel
+      };
+
+      // Saat awal dibuka, form 1, 2, 3 selalu kosong bersih
+      const [formData, setFormData] = useState(cleanInitialState);
+      const [hasSavedDraft, setHasSavedDraft] = useState(false);
+
+      const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+      const [saveAlert, setSaveAlert] = useState(null);
+      const [availableProjects, setAvailableProjects] = useState([]);
+      const invoiceRef = useRef(null);
+
+      // Check current user role from existing system
+      const [currentUser, setCurrentUser] = useState(null);
+
+      useEffect(() => {
+        // Cek apakah ada draft di browser
+        const saved = localStorage.getItem('ftth_invoice_generator_data');
+        if (saved) {
+          setHasSavedDraft(true);
+        }
+
+        // Load logged in user if available
+        const userStr = localStorage.getItem('ftth_user');
+        if (userStr) {
+          try { setCurrentUser(JSON.parse(userStr)); } catch(e) {}
+        }
+
+        // Fetch projects for auto-fill WO
+        fetch('/api/projects')
+          .then(res => res.json())
+          .then(data => {
+            if (Array.isArray(data)) setAvailableProjects(data);
+          })
+          .catch(() => {});
+      }, []);
+
+      // Auto Calculations
+      const totalNum = Number(formData.total) || 0;
+      const ppnPercentNum = Number(formData.ppn_persen) || 0;
+      const ppnNominal = Math.round(totalNum * (ppnPercentNum / 100));
+      const nilaiTagihan = totalNum + ppnNominal;
+      const terbilangText = totalNum > 0 ? terbilangIndonesia(nilaiTagihan) : "-";
+
+      // Input Change Handler
+      const handleChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        setFormData(prev => ({
+          ...prev,
+          [name]: type === 'checkbox' ? checked : value
+        }));
+      };
+
+      // Simpan ke localStorage
+      const handleSaveLocal = () => {
+        localStorage.setItem('ftth_invoice_generator_data', JSON.stringify(formData));
+        setHasSavedDraft(true);
+        setSaveAlert('Data invoice berhasil disimpan ke draft browser!');
+        setTimeout(() => setSaveAlert(null), 3000);
+      };
+
+      // Muat draft tersimpan
+      const handleLoadDraft = () => {
+        const saved = localStorage.getItem('ftth_invoice_generator_data');
+        if (saved) {
+          try {
+            setFormData(JSON.parse(saved));
+            setSaveAlert('Draft tersimpan berhasil dimuat kembali.');
+            setTimeout(() => setSaveAlert(null), 3000);
+          } catch(e) {}
+        }
+      };
+
+      // Reset form: Bersih total tanpa menyisakan data apapun kecuali nomor 4. Data dan Rekening
+      const handleReset = () => {
+        setFormData(cleanInitialState);
+        localStorage.removeItem('ftth_invoice_generator_data');
+        setHasSavedDraft(false);
+        setSaveAlert('Form 1, 2, 3 berhasil dibersihkan total tanpa sisa!');
+        setTimeout(() => setSaveAlert(null), 3000);
+      };
+
+      // Quick-fill from existing Work Order
+      const handleSelectWO = (e) => {
+        const pId = e.target.value;
+        if (!pId) return;
+        const p = availableProjects.find(item => item.id === pId);
+        if (p) {
+          setFormData(prev => ({
+            ...prev,
+            kepada: p.client_name || prev.kepada,
+            no_perjanjian: p.wo_number || prev.no_perjanjian,
+            pekerjaan: `Pekerjaan Konstruksi FTTH OSP Klaster ${p.cluster_name || '-'} (WO: ${p.wo_number || '-'}) - Termin Realisasi Proyek`,
+            total: p.contract_value || prev.total
+          }));
+        }
+      };
+
+      // =======================================================
+      // GENERATE PDF VIA HTML2CANVAS & JSPDF (A4 EXACT LAYOUT)
+      // =======================================================
+      const handleGeneratePDF = async () => {
+        // Validation required fields
+        const required = ['kepada', 'alamat', 'no_invoice', 'tgl_invoice', 'no_perjanjian', 'pekerjaan', 'total', 'bank_name', 'no_rekening', 'pemilik_rekening', 'nama_direktur'];
+        for (let field of required) {
+          if (!formData[field] && formData[field] !== 0) {
+            alert(`Harap isi kolom '${field.replace('_', ' ').toUpperCase()}' sebelum mengunduh PDF!`);
+            return;
+          }
+        }
+
+        setIsGeneratingPdf(true);
+        handleSaveLocal();
+
+        try {
+          const element = invoiceRef.current;
+          if (!element) return;
+
+          // Snapshot with html2canvas (Scale 2 for high quality sharpness)
+          const canvas = await html2canvas(element, {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff',
+            windowWidth: 1024
+          });
+
+          const imgData = canvas.toDataURL('image/jpeg', 0.98);
+          const { jsPDF } = window.jspdf;
+          
+          // A4 dimensions in mm: 210 x 297
+          const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4'
+          });
+
+          const pdfWidth = pdf.internal.pageSize.getWidth(); // 210mm
+          const pdfPageHeight = pdf.internal.pageSize.getHeight(); // 297mm
+          const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+          // Add image to PDF
+          pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, Math.min(imgHeight, pdfPageHeight));
+
+          // Clean filename
+          const cleanNoInv = (formData.no_invoice || '001').replace(/[^a-zA-Z0-9_-]/g, '_');
+          const cleanKepada = (formData.kepada || 'Klien').replace(/[^a-zA-Z0-9_-]/g, '_');
+          const filename = `INVOICE-${cleanNoInv}-${cleanKepada}.pdf`;
+
+          pdf.save(filename);
+        } catch (err) {
+          console.error('Gagal generate PDF:', err);
+          alert('Terjadi kesalahan saat memproses PDF: ' + err.message);
+        } finally {
+          setIsGeneratingPdf(false);
+        }
+      };
+
+      const handlePrint = () => {
+        window.print();
+      };
+
+      return (
+        <div className="min-h-screen flex flex-col">
+          {/* TOP NAVBAR */}
+          <header className="bg-slate-900 text-white shadow-md sticky top-0 z-40 no-print">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap justify-between items-center gap-3">
+              <div className="flex items-center gap-3">
+                <a href="/dashboard.html" className="flex items-center gap-2 hover:opacity-80 transition">
+                  <img src="/images/logo.png" alt="Logo" className="h-9 w-auto object-contain bg-white rounded p-0.5" />
+                  <div>
+                    <h1 className="font-bold text-sm tracking-wide text-white leading-tight">PT AKSES KWALITAS UNGGUL</h1>
+                    <p className="text-[11px] text-emerald-400 font-medium">Invoice Generator (Excel Template)</p>
+                  </div>
+                </a>
+              </div>
+
+              {/* Role Indicator & Actions */}
+              <div className="flex items-center gap-2 text-xs">
+                {currentUser && (
+                  <span className="bg-slate-800 text-slate-300 px-2.5 py-1 rounded border border-slate-700 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    User: <strong>{currentUser.name}</strong> ({currentUser.role})
+                  </span>
+                )}
+                <a 
+                  href="/dashboard.html" 
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg border border-slate-700 transition font-medium flex items-center gap-1">
+                  <span>← Dashboard Utama</span>
+                </a>
+              </div>
+            </div>
+          </header>
+
+          {/* NOTIFICATION TOAST */}
+          {saveAlert && (
+            <div className="fixed top-16 right-5 z-50 bg-emerald-600 text-white text-xs px-4 py-2.5 rounded-lg shadow-xl flex items-center gap-2 no-print transition-all">
+              <span>✓</span> {saveAlert}
+            </div>
+          )}
+
+          {/* MAIN WORKSPACE: 2 COLUMNS (FORM ON LEFT, PREVIEW ON RIGHT) */}
+          <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            {/* =================================================== */}
+            {/* LEFT COLUMN: FORM INPUT (COL-SPAN-5)                */}
+            {/* =================================================== */}
+            <div className="lg:col-span-5 bg-white rounded-xl shadow-sm border border-slate-200 p-5 no-print space-y-5">
+              <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
+                <div>
+                  <h2 className="font-bold text-slate-900 text-base flex items-center gap-1.5">
+                    <span>Formulir Tagihan</span>
+                  </h2>
+                  <p className="text-xs text-slate-500">Isi data di bawah, live preview otomatis terupdate.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {hasSavedDraft && (
+                    <button 
+                      onClick={handleLoadDraft} 
+                      type="button" 
+                      className="text-xs bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200 px-2.5 py-1 rounded font-medium transition flex items-center gap-1">
+                      <span>📂</span> Muat Draft
+                    </button>
+                  )}
+                  <button 
+                    onClick={handleReset} 
+                    type="button" 
+                    title="Kosongkan form 1, 2, 3 tanpa menghapus data bank & rekening"
+                    className="text-xs bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded font-semibold transition flex items-center gap-1 shadow-xs">
+                    <span>🗑️</span> Reset Form
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Fill From System WO */}
+              {availableProjects.length > 0 && (
+                <div className="bg-sky-50 border border-sky-200 rounded-lg p-3 text-xs">
+                  <label className="block font-semibold text-sky-900 mb-1">
+                    ⚡ Tarik Otomatis dari Work Order Sistem:
+                  </label>
+                  <select 
+                    onChange={handleSelectWO} 
+                    className="w-full bg-white border border-sky-300 rounded px-2.5 py-1.5 text-slate-700 font-medium">
+                    <option value="">-- Pilih Proyek Terdaftar di Database PT AKU --</option>
+                    {availableProjects.map(p => (
+                      <option key={p.id} value={p.id}>
+                        [{p.wo_number}] {p.client_name} - {p.cluster_name} (Rp {(p.contract_value || 0).toLocaleString('id-ID')})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <form onSubmit={(e) => { e.preventDefault(); handleGeneratePDF(); }} className="space-y-4 text-xs">
+                
+                {/* BAGIAN 1: INFO PELANGGAN */}
+                <div className="bg-slate-50/70 p-3.5 rounded-lg border border-slate-200 space-y-3">
+                  <h3 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider text-emerald-800 border-b border-slate-200 pb-1">
+                    1. Info Pelanggan & Klien
+                  </h3>
+                  
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Kepada / Nama Klien <span className="text-rose-500">*</span>
+                    </label>
+                    <input 
+                      type="text" 
+                      name="kepada" 
+                      value={formData.kepada} 
+                      onChange={handleChange} 
+                      placeholder="Contoh: PT TELKOM AKSES"
+                      required 
+                      className="w-full border border-slate-300 rounded-md px-3 py-1.5 focus:ring-1 focus:ring-emerald-600 focus:outline-none" 
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Alamat Klien (3 Baris) <span className="text-rose-500">*</span>
+                    </label>
+                    <textarea 
+                      name="alamat" 
+                      rows={3} 
+                      value={formData.alamat} 
+                      onChange={handleChange} 
+                      placeholder="Gedung / Jalan / Kota"
+                      required 
+                      className="w-full border border-slate-300 rounded-md px-3 py-1.5 focus:ring-1 focus:ring-emerald-600 focus:outline-none" 
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      NPWP Klien <span className="text-slate-400 font-normal">(Opsional)</span>
+                    </label>
+                    <input 
+                      type="text" 
+                      name="npwp" 
+                      value={formData.npwp} 
+                      onChange={handleChange} 
+                      placeholder="01.234.567.8-012.000"
+                      className="w-full border border-slate-300 rounded-md px-3 py-1.5 focus:ring-1 focus:ring-emerald-600 focus:outline-none" 
+                    />
+                  </div>
+                </div>
+
+                {/* BAGIAN 2: NOMOR & IDENTITAS INVOICE */}
+                <div className="bg-slate-50/70 p-3.5 rounded-lg border border-slate-200 space-y-3">
+                  <h3 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider text-emerald-800 border-b border-slate-200 pb-1">
+                    2. Identitas Faktur & Perjanjian
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        No. Invoice <span className="text-rose-500">*</span>
+                      </label>
+                      <input 
+                        type="text" 
+                        name="no_invoice" 
+                        value={formData.no_invoice} 
+                        onChange={handleChange} 
+                        required 
+                        className="w-full border border-slate-300 rounded-md px-3 py-1.5 focus:ring-1 focus:ring-emerald-600 focus:outline-none" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        No Faktur Pajak <span className="text-slate-400 font-normal">(Opsional)</span>
+                      </label>
+                      <input 
+                        type="text" 
+                        name="no_faktur_pajak" 
+                        value={formData.no_faktur_pajak} 
+                        onChange={handleChange} 
+                        className="w-full border border-slate-300 rounded-md px-3 py-1.5 focus:ring-1 focus:ring-emerald-600 focus:outline-none" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Tgl Invoice <span className="text-rose-500">*</span>
+                      </label>
+                      <input 
+                        type="date" 
+                        name="tgl_invoice" 
+                        value={formData.tgl_invoice} 
+                        onChange={handleChange} 
+                        required 
+                        className="w-full border border-slate-300 rounded-md px-3 py-1.5 focus:ring-1 focus:ring-emerald-600 focus:outline-none" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        No. Perjanjian / SPK <span className="text-rose-500">*</span>
+                      </label>
+                      <input 
+                        type="text" 
+                        name="no_perjanjian" 
+                        value={formData.no_perjanjian} 
+                        onChange={handleChange} 
+                        required 
+                        className="w-full border border-slate-300 rounded-md px-3 py-1.5 focus:ring-1 focus:ring-emerald-600 focus:outline-none" 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* BAGIAN 3: PEKERJAAN & NILAI TAGIHAN */}
+                <div className="bg-slate-50/70 p-3.5 rounded-lg border border-slate-200 space-y-3">
+                  <h3 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider text-emerald-800 border-b border-slate-200 pb-1">
+                    3. Rincian Pekerjaan & Nominal
+                  </h3>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Deskripsi Pekerjaan <span className="text-rose-500">*</span>
+                    </label>
+                    <textarea 
+                      name="pekerjaan" 
+                      rows={4} 
+                      value={formData.pekerjaan} 
+                      onChange={handleChange} 
+                      placeholder="Rincian scope pekerjaan FTTH OSP..."
+                      required 
+                      className="w-full border border-slate-300 rounded-md px-3 py-1.5 focus:ring-1 focus:ring-emerald-600 focus:outline-none leading-relaxed" 
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Nilai TOTAL DPP (Rp) <span className="text-rose-500">*</span>
+                      </label>
+                      <input 
+                        type="number" 
+                        name="total" 
+                        value={formData.total} 
+                        onChange={handleChange} 
+                        min="0"
+                        step="1000"
+                        required 
+                        className="w-full border border-slate-300 rounded-md px-3 py-1.5 focus:ring-1 focus:ring-emerald-600 focus:outline-none font-mono" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        PPN (%) <span className="text-rose-500">*</span>
+                      </label>
+                      <input 
+                        type="number" 
+                        name="ppn_persen" 
+                        value={formData.ppn_persen} 
+                        onChange={handleChange} 
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        required 
+                        className="w-full border border-slate-300 rounded-md px-3 py-1.5 focus:ring-1 focus:ring-emerald-600 focus:outline-none font-mono" 
+                      />
+                    </div>
+                  </div>
+
+                  {/* Summary Ringkasan Hitungan */}
+                  <div className="bg-white border border-slate-200 rounded p-2.5 space-y-1 text-[11px]">
+                    <div className="flex justify-between text-slate-600">
+                      <span>Total DPP:</span>
+                      <span className="font-mono font-semibold">{totalNum > 0 ? formatRupiah(totalNum) : 'Rp 0,-'}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                      <span>PPN ({ppnPercentNum}%):</span>
+                      <span className="font-mono font-semibold">{totalNum > 0 ? formatRupiah(ppnNominal) : 'Rp 0,-'}</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-800 font-bold border-t border-slate-100 pt-1 text-xs">
+                      <span>NILAI TAGIHAN:</span>
+                      <span className="font-mono text-emerald-700">{totalNum > 0 ? formatRupiah(nilaiTagihan) : 'Rp 0,-'}</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 italic pt-1 border-t border-slate-100">
+                      Terbilang: <strong>{totalNum > 0 ? terbilangText : '-'}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* BAGIAN 4: BANK & PENANDATANGAN */}
+                <div className="bg-slate-50/70 p-3.5 rounded-lg border border-slate-200 space-y-3">
+                  <h3 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider text-emerald-800 border-b border-slate-200 pb-1">
+                    4. Data Rekening & Penandatangan
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">Nama Bank *</label>
+                      <input 
+                        type="text" 
+                        name="bank_name" 
+                        value={formData.bank_name} 
+                        onChange={handleChange} 
+                        required 
+                        className="w-full border border-slate-300 rounded-md px-3 py-1.5 focus:ring-1 focus:ring-emerald-600 focus:outline-none" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">No. Rekening *</label>
+                      <input 
+                        type="text" 
+                        name="no_rekening" 
+                        value={formData.no_rekening} 
+                        onChange={handleChange} 
+                        required 
+                        className="w-full border border-slate-300 rounded-md px-3 py-1.5 focus:ring-1 focus:ring-emerald-600 focus:outline-none font-mono" 
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Atas Nama Rekening *</label>
+                    <input 
+                      type="text" 
+                      name="pemilik_rekening" 
+                      value={formData.pemilik_rekening} 
+                      onChange={handleChange} 
+                      required 
+                      className="w-full border border-slate-300 rounded-md px-3 py-1.5 focus:ring-1 focus:ring-emerald-600 focus:outline-none" 
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Nama Direktur (Tanda Tangan) *</label>
+                    <input 
+                      type="text" 
+                      name="nama_direktur" 
+                      value={formData.nama_direktur} 
+                      onChange={handleChange} 
+                      required 
+                      className="w-full border border-slate-300 rounded-md px-3 py-1.5 focus:ring-1 focus:ring-emerald-600 focus:outline-none font-semibold" 
+                    />
+                  </div>
+
+                  <div className="pt-1 flex items-center gap-2">
+                    <input 
+                      type="checkbox" 
+                      id="showLogoInHeader" 
+                      name="showLogoInHeader" 
+                      checked={formData.showLogoInHeader} 
+                      onChange={handleChange} 
+                      className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" 
+                    />
+                    <label htmlFor="showLogoInHeader" className="text-[11px] text-slate-600 cursor-pointer">
+                      Tampilkan Logo & Kop PT AKU di dalam kotak header hijau (Opsional)
+                    </label>
+                  </div>
+                </div>
+
+                {/* ACTION BUTTONS */}
+                <div className="pt-2 space-y-2">
+                  <button 
+                    type="submit" 
+                    disabled={isGeneratingPdf} 
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-4 rounded-lg shadow transition flex items-center justify-center gap-2 text-sm disabled:opacity-50">
+                    {isGeneratingPdf ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        <span>Membuat File PDF A4...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>📥</span>
+                        <span>Generate & Unduh PDF (A4)</span>
+                      </>
+                    )}
+                  </button>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button 
+                      type="button" 
+                      onClick={handlePrint} 
+                      className="bg-slate-800 hover:bg-slate-700 text-white font-medium py-2 px-3 rounded-lg border border-slate-700 transition flex items-center justify-center gap-1.5">
+                      <span>🖨️ Cetak / Print</span>
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={handleSaveLocal} 
+                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2 px-3 rounded-lg border border-slate-300 transition flex items-center justify-center gap-1.5">
+                      <span>💾 Simpan Draft</span>
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            {/* =================================================== */}
+            {/* RIGHT COLUMN: LIVE PREVIEW (EXACT EXCEL A4 SHEET)  */}
+            {/* =================================================== */}
+            <div className="lg:col-span-7 space-y-3">
+              <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-200 no-print">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                  <span className="font-bold text-xs text-slate-800">Live Preview Template Excel (Ukuran Kertas A4)</span>
+                </div>
+                <div className="text-[11px] text-slate-500">
+                  Font: Arial/Helvetica | Border: 1px Solid Black
+                </div>
+              </div>
+
+              {/* SCROLLABLE WRAPPER FOR SMALLER DESKTOPS */}
+              <div className="bg-slate-200/80 p-3 sm:p-5 rounded-xl border border-slate-300 overflow-x-auto flex justify-center shadow-inner">
+                
+                {/* ------------------------------------------------ */}
+                {/* THE INVOICE SHEET (CAPTURED BY HTML2CANVAS)       */}
+                {/* ------------------------------------------------ */}
+                <div 
+                  id="print-area"
+                  ref={invoiceRef}
+                  className="a4-sheet shadow-2xl p-8"
+                  style={{ width: '794px', backgroundColor: '#ffffff', color: '#000000' }}
+                >
+                  
+                  {/* 1. [HEADER] Kotak besar di paling atas, border hijau tebal 2px, kosong untuk logo/kop surat. Tinggi 120px. */}
+                  <div 
+                    style={{ 
+                      height: '120px', 
+                      border: '2px solid #16a34a', 
+                      marginBottom: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      position: 'relative',
+                      boxSizing: 'border-box',
+                      backgroundColor: formData.showLogoInHeader ? '#ffffff' : '#fafafa'
+                    }}
+                  >
+                    {formData.showLogoInHeader ? (
+                      <div className="flex items-center justify-between w-full px-6">
+                        <div className="flex items-center gap-4">
+                          <img src="/images/logo.png" alt="Logo PT AKU" style={{ height: '70px', width: 'auto', objectFit: 'contain' }} />
+                          <div>
+                            <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e3a5f', margin: 0, letterSpacing: '0.5px' }}>
+                              PT AKSES KWALITAS UNGGUL
+                            </h2>
+                            <p style={{ fontSize: '11px', color: '#475569', margin: '2px 0 0 0', fontWeight: '500' }}>
+                              Infrastruktur Telekomunikasi & Jaringan Fiber Optic (FTTH OSP)
+                            </p>
+                            <p style={{ fontSize: '10px', color: '#64748b', margin: 0 }}>
+                              Jl. Raya Hankam No. 88, Pondok Gede | Telp: (021) 8499-1234
+                            </p>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right', fontSize: '10px', color: '#475569', borderLeft: '1px solid #cbd5e1', paddingLeft: '12px' }}>
+                          <span style={{ fontWeight: 'bold', color: '#16a34a' }}>OFFICIAL CONTRACTOR</span><br />
+                          Mitra Telkom Akses & Icon+
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '11px', fontStyle: 'italic' }}>
+                        {/* Kosong untuk logo / kop surat (Sesuai spesifikasi template Excel) */}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. [JUDUL] Baris di bawahnya bertuliskan "INVOICE" di tengah, dengan border tabel 1px solid black. */}
+                  <div 
+                    style={{ 
+                      border: '1px solid #000000', 
+                      textAlign: 'center', 
+                      padding: '7px 0', 
+                      fontWeight: 'bold', 
+                      fontSize: '18px', 
+                      letterSpacing: '3px',
+                      backgroundColor: '#f8fafc',
+                      marginBottom: '10px'
+                    }}
+                  >
+                    INVOICE
+                  </div>
+
+                  {/* 3. [INFO PELANGGAN - 2 Kolom Tabel] */}
+                  {/* Kolom Kiri: Kepada, Alamat, NPWP | Kolom Kanan: No Invoice, No Faktur Pajak, Tgl Invoice, No Perjanjian */}
+                  <table className="excel-table" style={{ marginBottom: '12px', fontSize: '11px' }}>
+                    <tbody>
+                      <tr>
+                        {/* Kolom Kiri (Lebar ~54%, rowspan 4 baris) */}
+                        <td 
+                          rowSpan={4} 
+                          style={{ 
+                            width: '54%', 
+                            verticalAlign: 'top', 
+                            padding: '8px 10px',
+                            border: '1px solid #000000'
+                          }}
+                        >
+                          <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', fontSize: '11px' }}>
+                            <tbody>
+                              <tr>
+                                <td style={{ width: '65px', fontWeight: 'bold', verticalAlign: 'top', border: 'none', padding: '2px 0' }}>Kepada</td>
+                                <td style={{ width: '12px', verticalAlign: 'top', border: 'none', padding: '2px 0' }}>:</td>
+                                <td style={{ fontWeight: 'bold', verticalAlign: 'top', border: 'none', padding: '2px 0' }}>
+                                  {formData.kepada || '-'}
+                                </td>
+                              </tr>
+                              <tr>
+                                <td style={{ fontWeight: 'bold', verticalAlign: 'top', border: 'none', padding: '2px 0' }}>Alamat</td>
+                                <td style={{ verticalAlign: 'top', border: 'none', padding: '2px 0' }}>:</td>
+                                <td style={{ verticalAlign: 'top', border: 'none', padding: '2px 0', whiteSpace: 'pre-line', minHeight: '44px', lineHeight: '1.4' }}>
+                                  {formData.alamat || '-'}
+                                </td>
+                              </tr>
+                              <tr>
+                                <td style={{ fontWeight: 'bold', verticalAlign: 'top', border: 'none', padding: '2px 0' }}>NPWP</td>
+                                <td style={{ verticalAlign: 'top', border: 'none', padding: '2px 0' }}>:</td>
+                                <td style={{ verticalAlign: 'top', border: 'none', padding: '2px 0' }}>
+                                  {formData.npwp || '-'}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </td>
+
+                        {/* Kolom Kanan: 4 Baris */}
+                        <td style={{ width: '20%', fontWeight: 'bold', padding: '5px 8px', border: '1px solid #000000', backgroundColor: '#fafafa' }}>
+                          No. Invoice
+                        </td>
+                        <td style={{ width: '26%', padding: '5px 8px', border: '1px solid #000000', fontFamily: 'monospace', fontWeight: 'bold' }}>
+                          {formData.no_invoice || '-'}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style={{ fontWeight: 'bold', padding: '5px 8px', border: '1px solid #000000', backgroundColor: '#fafafa' }}>
+                          No Faktur Pajak
+                        </td>
+                        <td style={{ padding: '5px 8px', border: '1px solid #000000', fontFamily: 'monospace' }}>
+                          {formData.no_faktur_pajak || '-'}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style={{ fontWeight: 'bold', padding: '5px 8px', border: '1px solid #000000', backgroundColor: '#fafafa' }}>
+                          Tgl Invoice
+                        </td>
+                        <td style={{ padding: '5px 8px', border: '1px solid #000000' }}>
+                          {formatDateIndo(formData.tgl_invoice)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style={{ fontWeight: 'bold', padding: '5px 8px', border: '1px solid #000000', backgroundColor: '#fafafa' }}>
+                          No. Perjanjian
+                        </td>
+                        <td style={{ padding: '5px 8px', border: '1px solid #000000', fontWeight: '600' }}>
+                          {formData.no_perjanjian || '-'}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  {/* 4. [TABEL UTAMA - 3 Kolom: Item | Uraian | Jumlah] */}
+                  <div style={{ position: 'relative', marginBottom: '12px' }}>
+                    
+                    {/* Watermark text "Page 1" besar transparan di tengah tabel persis seperti di gambar */}
+                    <div className="excel-watermark">
+                      Page 1
+                    </div>
+
+                    <table className="excel-table" style={{ fontSize: '11px', position: 'relative', zIndex: 2 }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#f1f5f9', fontWeight: 'bold' }}>
+                          <th style={{ width: '45px', textAlign: 'center', padding: '7px 4px', border: '1px solid #000000' }}>
+                            Item
+                          </th>
+                          <th style={{ textAlign: 'center', padding: '7px 8px', border: '1px solid #000000' }}>
+                            Uraian
+                          </th>
+                          <th style={{ width: '180px', textAlign: 'center', padding: '7px 8px', border: '1px solid #000000' }}>
+                            Jumlah
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* Baris Konten Pekerjaan Utama (Spacious Height dengan Watermark di tengah) */}
+                        <tr style={{ minHeight: '260px' }}>
+                          <td style={{ textAlign: 'center', verticalAlign: 'top', padding: '12px 4px', border: '1px solid #000000', fontWeight: 'bold' }}>
+                            1
+                          </td>
+                          <td style={{ verticalAlign: 'top', padding: '12px 10px', minHeight: '260px', height: '260px', border: '1px solid #000000' }}>
+                            <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>PEKERJAAN :</div>
+                            <div style={{ whiteSpace: 'pre-line', lineHeight: '1.6', color: '#1e293b' }}>
+                              {formData.pekerjaan || '-'}
+                            </div>
+                          </td>
+                          <td style={{ verticalAlign: 'top', padding: '12px 10px', border: '1px solid #000000', textAlign: 'right' }}>
+                            {/* Kosong di area deskripsi pekerjaan */}
+                          </td>
+                        </tr>
+
+                        {/* Baris TOTAL */}
+                        <tr>
+                          <td style={{ border: '1px solid #000000' }}></td>
+                          <td style={{ fontWeight: 'bold', padding: '6px 10px', border: '1px solid #000000', textAlign: 'right' }}>
+                            TOTAL
+                          </td>
+                          <td style={{ fontWeight: 'bold', padding: '6px 10px', border: '1px solid #000000', textAlign: 'right', fontFamily: 'monospace', fontSize: '12px' }}>
+                            {totalNum > 0 ? formatRupiah(totalNum) : 'Rp 0,-'}
+                          </td>
+                        </tr>
+
+                        {/* Baris PPN */}
+                        <tr>
+                          <td style={{ border: '1px solid #000000' }}></td>
+                          <td style={{ fontWeight: 'bold', padding: '6px 10px', border: '1px solid #000000', textAlign: 'right' }}>
+                            PPN {ppnPercentNum}%
+                          </td>
+                          <td style={{ fontWeight: 'bold', padding: '6px 10px', border: '1px solid #000000', textAlign: 'right', fontFamily: 'monospace', fontSize: '12px' }}>
+                            {totalNum > 0 ? formatRupiah(ppnNominal) : 'Rp 0,-'}
+                          </td>
+                        </tr>
+
+                        {/* Baris NILAI TAGIHAN */}
+                        <tr style={{ backgroundColor: '#f8fafc' }}>
+                          <td style={{ border: '1px solid #000000' }}></td>
+                          <td style={{ fontWeight: 'bold', padding: '7px 10px', border: '1px solid #000000', textAlign: 'right', letterSpacing: '0.5px' }}>
+                            NILAI TAGIHAN
+                          </td>
+                          <td style={{ fontWeight: 'bold', padding: '7px 10px', border: '1px solid #000000', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: '#0f172a' }}>
+                            {totalNum > 0 ? formatRupiah(nilaiTagihan) : 'Rp 0,-'}
+                          </td>
+                        </tr>
+
+                        {/* Baris TERBILANG: Merge / Span 3 Kolom */}
+                        <tr>
+                          <td 
+                            colSpan={3} 
+                            style={{ 
+                              padding: '8px 10px', 
+                              border: '1px solid #000000', 
+                              backgroundColor: '#ffffff'
+                            }}
+                          >
+                            <span style={{ fontWeight: 'bold' }}>TERBILANG : </span>
+                            {totalNum > 0 ? (
+                              <span style={{ fontStyle: 'italic', fontWeight: 'bold', textDecoration: 'underline' }}>
+                                # {terbilangText} #
+                              </span>
+                            ) : (
+                              <span style={{ fontStyle: 'italic', color: '#64748b' }}>-</span>
+                            )}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* 5. [FOOTER] */}
+                  {/* Kiri Bawah: Nama Bank, No Rekening, Nama PT | Kanan Bawah: Kotak Tanda Tangan */}
+                  <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginTop: '10px', fontSize: '11px' }}>
+                    <tbody>
+                      <tr>
+                        {/* Kiri Bawah: Info Rekening Pembayaran */}
+                        <td style={{ width: '60%', verticalAlign: 'top', border: 'none', padding: '4px 6px' }}>
+                          <table style={{ borderCollapse: 'collapse', border: 'none', fontSize: '11px' }}>
+                            <tbody>
+                              <tr>
+                                <td style={{ width: '90px', fontWeight: 'bold', padding: '2px 0', border: 'none' }}>Nama Bank</td>
+                                <td style={{ width: '10px', padding: '2px 0', border: 'none' }}>:</td>
+                                <td style={{ fontWeight: 'bold', padding: '2px 0', border: 'none' }}>{formData.bank_name || 'Bank BNI'}</td>
+                              </tr>
+                              <tr>
+                                <td style={{ fontWeight: 'bold', padding: '2px 0', border: 'none' }}>No Rekening</td>
+                                <td style={{ padding: '2px 0', border: 'none' }}>:</td>
+                                <td style={{ fontWeight: 'bold', padding: '2px 0', border: 'none', fontFamily: 'monospace' }}>{formData.no_rekening || '5150005089'}</td>
+                              </tr>
+                              <tr>
+                                <td style={{ fontWeight: 'bold', padding: '2px 0', border: 'none' }}>Nama</td>
+                                <td style={{ padding: '2px 0', border: 'none' }}>:</td>
+                                <td style={{ fontWeight: 'bold', padding: '2px 0', border: 'none' }}>{formData.pemilik_rekening || 'PT AKSES KWALITAS UNGGUL'}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+
+                          <div style={{ marginTop: '18px', fontSize: '10px', color: '#64748b' }}>
+                            * Pembayaran sah apabila telah dikonfirmasi masuk ke rekening perusahaan di atas.
+                          </div>
+                        </td>
+
+                        {/* Kanan Bawah: Kotak tanda tangan dengan border */}
+                        {/* Header: "Direktur Utama" | Body: area kosong tinggi 120px | Footer: Nama "Suprapto" */}
+                        <td style={{ width: '40%', verticalAlign: 'top', border: 'none', padding: '0 0 0 20px' }}>
+                          <div 
+                            style={{ 
+                              width: '210px', 
+                              marginLeft: 'auto', 
+                              border: '1px solid #000000', 
+                              boxSizing: 'border-box',
+                              backgroundColor: '#ffffff'
+                            }}
+                          >
+                            {/* Header Tanda Tangan */}
+                            <div 
+                              style={{ 
+                                textAlign: 'center', 
+                                padding: '6px 0', 
+                                fontWeight: 'bold', 
+                                borderBottom: '1px solid #000000',
+                                fontSize: '11px',
+                                backgroundColor: '#f8fafc'
+                              }}
+                            >
+                              Direktur Utama
+                            </div>
+
+                            {/* Body: Area Kosong 120px untuk Tanda Tangan & Cap */}
+                            <div style={{ height: '120px', width: '100%', position: 'relative' }}>
+                              {/* Area tanda tangan basah & stempel perusahaan */}
+                            </div>
+
+                            {/* Footer: Nama Penandatangan */}
+                            <div 
+                              style={{ 
+                                textAlign: 'center', 
+                                padding: '6px 0', 
+                                fontWeight: 'bold', 
+                                borderTop: '1px solid #000000',
+                                fontSize: '11px',
+                                textDecoration: 'underline'
+                              }}
+                            >
+                              {formData.nama_direktur || 'Suprapto'}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                </div>
+              </div>
+            </div>
+
+          </main>
+
+          {/* FOOTER */}
+          <footer className="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-500 no-print mt-auto">
+            PT Akses Kwalitas Unggul &copy; 2026 | Sistem Monitoring FTTH OSP & Invoice Management
+          </footer>
+        </div>
+      );
+    }
+
+    // Render the React application
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<InvoiceGeneratorApp />);
+  </script>
+</body>
+</html>

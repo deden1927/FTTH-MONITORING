@@ -24,7 +24,7 @@ app.use(helmet({
 
 const isAllowedOrigin = (origin) => {
   if (!origin) return true;
-  return /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(origin);
+  return /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|([a-z0-9-]+\.)*akseskwalitasunggul\.com)(:\d+)?$/i.test(origin);
 };
 
 app.use(cors({
@@ -570,7 +570,7 @@ app.get('/api/invoices', authenticateToken, (req, res) => {
   res.json(db.invoices || []);
 });
 
-app.post('/api/invoices', authenticateToken, requireRoles(['finance', 'superadmin', 'direktur']), (req, res) => {
+app.post('/api/invoices', authenticateToken, requireRoles(['finance', 'superadmin']), (req, res) => {
   const db = readDB();
   if (!db.invoices) db.invoices = [];
 
@@ -593,7 +593,7 @@ app.post('/api/invoices', authenticateToken, requireRoles(['finance', 'superadmi
   res.status(201).json(newInv);
 });
 
-app.put('/api/invoices/:id/status', authenticateToken, requireRoles(['finance', 'superadmin', 'direktur']), (req, res) => {
+app.put('/api/invoices/:id/status', authenticateToken, requireRoles(['finance', 'superadmin']), (req, res) => {
   const db = readDB();
   const idx = (db.invoices || []).findIndex(inv => inv.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Invoice not found' });
@@ -902,7 +902,18 @@ app.delete('/api/gallery/:id', authenticateToken, requireRoles(['superadmin']), 
 });
 
 // -------------------------------------------------------------
-// 16. SERVER INITIALIZATION
+// 16. GLOBAL ERROR HANDLER
+// -------------------------------------------------------------
+app.use((err, req, res, next) => {
+  if (err && err.message && err.message.includes('CORS')) {
+    return res.status(403).json({ success: false, message: err.message });
+  }
+  console.error(err.stack || err);
+  res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server.' });
+});
+
+// -------------------------------------------------------------
+// 17. SERVER INITIALIZATION
 // -------------------------------------------------------------
 app.listen(PORT, () => {
   console.log(`PT Akses Kwalitas Unggul Server running at http://localhost:${PORT}`);

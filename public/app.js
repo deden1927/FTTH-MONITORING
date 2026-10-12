@@ -73,18 +73,23 @@ async function handleLogin(e) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: u, password: p })
     });
-    const data = await res.json();
+    let data;
+    try {
+      data = await res.json();
+    } catch (_) {
+      throw new Error(`Server merespons error (Status ${res.status}).`);
+    }
     if (data.success) {
       localStorage.setItem('ftth_user', JSON.stringify(data.user));
       localStorage.setItem('ftth_token', data.token);
       currentUser = data.user;
       showAppBasedOnRole();
     } else {
-      errDiv.textContent = data.message;
+      errDiv.textContent = data.message || 'Login gagal.';
       errDiv.classList.remove('hidden');
     }
   } catch(err) {
-    errDiv.textContent = 'Gagal terhubung ke server.';
+    errDiv.textContent = err.message || 'Gagal terhubung ke server.';
     errDiv.classList.remove('hidden');
   }
 }
@@ -115,6 +120,13 @@ function showAppBasedOnRole() {
   const tabGalleryMgmt = document.getElementById('tab-gallery-mgmt');
   const btnTambahWO = document.getElementById('btnTambahWO');
   const btnAddExecutor = document.getElementById('btnAddExecutor');
+  const btnTambahInvoice = document.getElementById('btnTambahInvoice');
+  const btnInvoicePdfGenerator = document.getElementById('btnInvoicePdfGenerator');
+
+  // Hak akses invoice: Hanya Super Admin & Finance
+  const canManageInvoice = currentUser && ['superadmin', 'finance'].includes(currentUser.role);
+  if (btnTambahInvoice) btnTambahInvoice.style.display = canManageInvoice ? 'flex' : 'none';
+  if (btnInvoicePdfGenerator) btnInvoicePdfGenerator.style.display = canManageInvoice ? 'flex' : 'none';
 
   // Reset default
   tabDash.style.display = 'flex';
@@ -828,11 +840,13 @@ async function loadInvoices() {
           <td class="p-3 text-slate-600">${inv.due_date}</td>
           <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 font-medium">${inv.aging_category}</span></td>
           <td class="p-3 text-center">
-            ${!isLunas ? `
-              <button onclick="markInvoicePaid('${inv.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-[11px] font-semibold shadow-xs">
-                Tandai Lunas
-              </button>
-            ` : `<span class="text-emerald-600 font-bold text-[11px] flex items-center justify-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5"></i> Masuk Kas</span>`}
+            ${!isLunas ? (
+              (currentUser && ['superadmin', 'finance'].includes(currentUser.role)) ? `
+                <button onclick="markInvoicePaid('${inv.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-[11px] font-semibold shadow-xs">
+                  Tandai Lunas
+                </button>
+              ` : `<span class="text-slate-400 text-[11px] font-medium">Belum Lunas</span>`
+            ) : `<span class="text-emerald-600 font-bold text-[11px] flex items-center justify-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5"></i> Masuk Kas</span>`}
           </td>
         </tr>
       `;
