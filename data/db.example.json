@@ -51,44 +51,6 @@
       "active_wos": 1
     }
   ],
-  "drums": [
-    {
-      "id": "DRUM-001",
-      "cable_type": "Kabel Udara (KU) 48 Core G.652D",
-      "initial_meters": 4000,
-      "used_meters": 3200,
-      "remaining_meters": 800,
-      "allocated_to": "SP-TA-JKT-2026-0819",
-      "status": "Active"
-    },
-    {
-      "id": "DRUM-002",
-      "cable_type": "Kabel Udara (KU) 24 Core G.652D",
-      "initial_meters": 4000,
-      "used_meters": 3850,
-      "remaining_meters": 150,
-      "allocated_to": "WO-ICON-BDG-0142",
-      "status": "Active"
-    },
-    {
-      "id": "DRUM-003",
-      "cable_type": "Kabel Udara (KU) 96 Core G.652D",
-      "initial_meters": 5000,
-      "used_meters": 4100,
-      "remaining_meters": 900,
-      "allocated_to": "SPK-SRG-CRB-0089",
-      "status": "Active"
-    },
-    {
-      "id": "DRUM-004",
-      "cable_type": "Kabel Udara (KU) 24 Core G.652D",
-      "initial_meters": 4000,
-      "used_meters": 0,
-      "remaining_meters": 4000,
-      "allocated_to": "SP-TA-TGR-2026-0412",
-      "status": "Reserved"
-    }
-  ],
   "projects": [
     {
       "id": "proj-5",
@@ -273,7 +235,6 @@
       "opm_power": "-"
     }
   ],
-  "boq_items": [],
   "invoices": [
     {
       "id": "inv-001",
