@@ -10,7 +10,7 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DB_FILE = path.join(__dirname, 'data', 'db.json');
+const DB_FILE = process.env.DB_FILE || path.join(__dirname, 'data', 'db.json');
 const JWT_SECRET = process.env.JWT_SECRET || 'FTTH_SECURE_TOKEN_SECRET_KEY_AKU_2026';
 const JWT_EXPIRES_IN = '12h';
 
@@ -449,6 +449,18 @@ app.post('/api/projects', authenticateToken, requireRoles(['direktur', 'superadm
 
   db.projects.push(newProject);
   db.milestones.push(...defaultMilestones);
+  if (!db.bon_material) db.bon_material = [];
+  db.bon_material.push({
+    id: 'bon-' + newProjId,
+    project_id: newProjId,
+    wo_number: newProject.wo_number,
+    status: 'Draft',
+    notes: '',
+    items: [],
+    created_by: req.user ? req.user.id : '',
+    created_at: newProject.created_at,
+    updated_at: newProject.created_at
+  });
   writeDB(db);
 
   res.status(201).json(newProject);
@@ -466,6 +478,7 @@ app.delete('/api/projects/:id', authenticateToken, requireRoles(['direktur', 'su
   db.milestones = (db.milestones || []).filter(m => m.project_id !== pId);
   db.invoices = (db.invoices || []).filter(inv => inv.project_id !== pId);
   db.mandor_payouts = (db.mandor_payouts || []).filter(mp => mp.project_id !== pId);
+  db.bon_material = (db.bon_material || []).filter(b => b.project_id !== pId);
 
   writeDB(db);
   res.json({ message: 'Project deleted successfully', deletedProject });
@@ -866,7 +879,199 @@ app.delete('/api/gallery/:id', authenticateToken, requireRoles(['superadmin']), 
 });
 
 // -------------------------------------------------------------
-// 16. GLOBAL ERROR HANDLER
+// 16. BON MATERIAL & MATERIAL MASTER API
+// -------------------------------------------------------------
+const DEFAULT_MATERIALS = [
+  { name: 'Tiang Beton 7m', category: 'Tiang', variant: '7m', unit: 'btg' },
+  { name: 'Tiang Beton 9m', category: 'Tiang', variant: '9m', unit: 'btg' },
+  { name: 'Kabel ADSS 12 Core', category: 'Kabel', variant: 'ADSS 12c', unit: 'm' },
+  { name: 'Kabel ADSS 24 Core', category: 'Kabel', variant: 'ADSS 24c', unit: 'm' },
+  { name: 'Kabel ADSS 48 Core', category: 'Kabel', variant: 'ADSS 48c', unit: 'm' },
+  { name: 'Kabel ADSS 96 Core', category: 'Kabel', variant: 'ADSS 96c', unit: 'm' },
+  { name: 'Kabel SCPT 12 Core', category: 'Kabel', variant: 'SCPT 12c', unit: 'm' },
+  { name: 'Kabel SCPT 24 Core', category: 'Kabel', variant: 'SCPT 24c', unit: 'm' },
+  { name: 'Kabel SCPT 48 Core', category: 'Kabel', variant: 'SCPT 48c', unit: 'm' },
+  { name: 'Kabel SCPT 96 Core', category: 'Kabel', variant: 'SCPT 96c', unit: 'm' },
+  { name: 'ODP Splitter 1:8', category: 'ODP', variant: '1:8', unit: 'titik' },
+  { name: 'ODP Splitter 1:16', category: 'ODP', variant: '1:16', unit: 'titik' },
+  { name: 'Bracket A', category: 'Aksesoris Tiang', variant: 'ADSS', unit: 'pcs' },
+  { name: 'Tambat Mati Dead End', category: 'Aksesoris Tiang', variant: 'ADSS', unit: 'pcs' },
+  { name: 'Tambat Mati Helical', category: 'Aksesoris Tiang', variant: 'ADSS', unit: 'pcs' },
+  { name: 'Bracket A', category: 'Aksesoris Tiang', variant: 'SCPT', unit: 'pcs' },
+  { name: 'Span Wartel', category: 'Aksesoris Tiang', variant: 'SCPT', unit: 'pcs' },
+  { name: 'Strangclamp', category: 'Aksesoris Tiang', variant: 'SCPT', unit: 'pcs' },
+  { name: 'Slack Support', category: 'Slack Support', variant: '', unit: 'pcs' }
+];
+
+const MATERIAL_CATEGORIES = ['Tiang', 'Kabel', 'ODP', 'Aksesoris Tiang', 'Slack Support', 'Lainnya'];
+
+function ensureMaterialSeeds() {
+  const db = readDB();
+  if (Array.isArray(db.materials) && db.materials.length > 0) return;
+  db.materials = DEFAULT_MATERIALS.map((m, i) => ({
+    id: 'mat-seed-' + String(i + 1).padStart(3, '0'),
+    name: m.name,
+    category: m.category,
+    variant: m.variant,
+    unit: m.unit,
+    stock_qty: 0,
+    min_stock: 5,
+    is_custom: false,
+    created_at: new Date().toISOString().split('T')[0]
+  }));
+  if (!Array.isArray(db.bon_material)) db.bon_material = [];
+  writeDB(db);
+}
+
+// --- Material Master (bisa di-extend user) ---
+app.get('/api/materials', authenticateToken, (req, res) => {
+  const db = readDB();
+  res.json(db.materials || []);
+});
+
+app.post('/api/materials', authenticateToken, requireRoles(['direktur', 'superadmin', 'pm']), (req, res) => {
+  const db = readDB();
+  if (!db.materials) db.materials = [];
+  const { name, category, variant, unit, stock_qty, min_stock } = req.body;
+  if (!name || !String(name).trim()) {
+    return res.status(400).json({ success: false, message: 'Nama material wajib diisi!' });
+  }
+  const newMat = {
+    id: 'mat-' + Date.now(),
+    name: String(name).trim(),
+    category: MATERIAL_CATEGORIES.includes(category) ? category : 'Lainnya',
+    variant: String(variant || '').trim(),
+    unit: String(unit || 'pcs').trim(),
+    stock_qty: Number(stock_qty) || 0,
+    min_stock: Number(min_stock) || 5,
+    is_custom: true,
+    created_at: new Date().toISOString().split('T')[0]
+  };
+  db.materials.push(newMat);
+  writeDB(db);
+  res.status(201).json({ success: true, message: 'Material berhasil ditambahkan.', material: newMat });
+});
+
+app.put('/api/materials/:id', authenticateToken, requireRoles(['direktur', 'superadmin', 'pm']), (req, res) => {
+  const db = readDB();
+  const index = (db.materials || []).findIndex(m => m.id === req.params.id);
+  if (index === -1) return res.status(404).json({ success: false, message: 'Material tidak ditemukan.' });
+
+  // Whitelisting field to prevent mass assignment
+  const { name, category, variant, unit, stock_qty, min_stock } = req.body;
+  if (name !== undefined) db.materials[index].name = String(name).trim();
+  if (category !== undefined && MATERIAL_CATEGORIES.includes(category)) db.materials[index].category = category;
+  if (variant !== undefined) db.materials[index].variant = String(variant).trim();
+  if (unit !== undefined) db.materials[index].unit = String(unit).trim();
+  if (stock_qty !== undefined) db.materials[index].stock_qty = Number(stock_qty) || 0;
+  if (min_stock !== undefined) db.materials[index].min_stock = Number(min_stock) || 0;
+
+  writeDB(db);
+  res.json({ success: true, message: 'Material berhasil diupdate.' });
+});
+
+app.delete('/api/materials/:id', authenticateToken, requireRoles(['direktur', 'superadmin']), (req, res) => {
+  const db = readDB();
+  const index = (db.materials || []).findIndex(m => m.id === req.params.id);
+  if (index === -1) return res.status(404).json({ success: false, message: 'Material tidak ditemukan.' });
+  const [removed] = db.materials.splice(index, 1);
+  writeDB(db);
+  res.json({ success: true, message: 'Material dihapus.', material: removed });
+});
+
+// --- Bon Material (1 bon per WO) ---
+function sanitizeBonItem(raw) {
+  const arrived = Number(raw.qty_arrived) || 0;
+  const used = Number(raw.qty_used) || 0;
+  const remaining = (raw.qty_remaining !== undefined && raw.qty_remaining !== null && raw.qty_remaining !== '')
+    ? Number(raw.qty_remaining)
+    : arrived - used;
+  return {
+    id: String(raw.id || ('boni-' + Date.now() + '-' + Math.floor(Math.random() * 1000))),
+    material_id: String(raw.material_id || ''),
+    name: String(raw.name || '').trim(),
+    category: String(raw.category || 'Lainnya'),
+    variant: String(raw.variant || ''),
+    unit: String(raw.unit || 'pcs'),
+    qty_planned: Number(raw.qty_planned) || 0,
+    qty_arrived: arrived,
+    qty_used: used,
+    qty_remaining: Number.isFinite(remaining) ? remaining : 0
+  };
+}
+
+app.get('/api/bon-material', authenticateToken, (req, res) => {
+  const db = readDB();
+  let list = db.bon_material || [];
+  if (req.query.project_id) {
+    list = list.filter(b => b.project_id === req.query.project_id);
+  }
+  res.json(list);
+});
+
+app.get('/api/bon-material/:id', authenticateToken, (req, res) => {
+  const db = readDB();
+  const bon = (db.bon_material || []).find(b => b.id === req.params.id);
+  if (!bon) return res.status(404).json({ success: false, message: 'Bon material tidak ditemukan.' });
+  res.json(bon);
+});
+
+app.post('/api/bon-material', authenticateToken, requireRoles(['direktur', 'superadmin', 'pm']), (req, res) => {
+  const db = readDB();
+  const { project_id, notes } = req.body;
+  const project = (db.projects || []).find(p => p.id === project_id);
+  if (!project) {
+    return res.status(404).json({ success: false, message: 'WO/proyek tidak ditemukan.' });
+  }
+  const existing = (db.bon_material || []).find(b => b.project_id === project_id);
+  if (existing) {
+    return res.status(409).json({ success: false, message: 'Bon material untuk WO ini sudah ada.', bon: existing });
+  }
+  const today = new Date().toISOString().split('T')[0];
+  const newBon = {
+    id: 'bon-' + Date.now(),
+    project_id: project.id,
+    wo_number: project.wo_number,
+    status: 'Draft',
+    notes: String(notes || '').trim(),
+    items: [],
+    created_by: req.user ? req.user.id : '',
+    created_at: today,
+    updated_at: today
+  };
+  if (!db.bon_material) db.bon_material = [];
+  db.bon_material.push(newBon);
+  writeDB(db);
+  res.status(201).json({ success: true, message: 'Bon material dibuat.', bon: newBon });
+});
+
+app.put('/api/bon-material/:id', authenticateToken, requireRoles(['direktur', 'superadmin', 'pm']), (req, res) => {
+  const db = readDB();
+  const bon = (db.bon_material || []).find(b => b.id === req.params.id);
+  if (!bon) return res.status(404).json({ success: false, message: 'Bon material tidak ditemukan.' });
+
+  const { status, notes, items } = req.body;
+  if (status !== undefined && ['Draft', 'Disetujui', 'Selesai'].includes(status)) bon.status = status;
+  if (notes !== undefined) bon.notes = String(notes).trim();
+  if (Array.isArray(items)) {
+    bon.items = items.map(sanitizeBonItem);
+  }
+  bon.updated_at = new Date().toISOString().split('T')[0];
+  writeDB(db);
+  res.json({ success: true, message: 'Bon material diupdate.', bon });
+});
+
+app.delete('/api/bon-material/:id', authenticateToken, requireRoles(['direktur', 'superadmin']), (req, res) => {
+  const db = readDB();
+  const index = (db.bon_material || []).findIndex(b => b.id === req.params.id);
+  if (index === -1) return res.status(404).json({ success: false, message: 'Bon material tidak ditemukan.' });
+  const [removed] = db.bon_material.splice(index, 1);
+  writeDB(db);
+  res.json({ success: true, message: 'Bon material dihapus.', bon: removed });
+});
+
+// -------------------------------------------------------------
+// 17. GLOBAL ERROR HANDLER
 // -------------------------------------------------------------
 app.use((err, req, res, next) => {
   if (err && err.message && err.message.includes('CORS')) {
@@ -877,8 +1082,9 @@ app.use((err, req, res, next) => {
 });
 
 // -------------------------------------------------------------
-// 17. SERVER INITIALIZATION
+// 18. SERVER INITIALIZATION
 // -------------------------------------------------------------
 app.listen(PORT, () => {
+  ensureMaterialSeeds();
   console.log(`PT Akses Kwalitas Unggul Server running at http://localhost:${PORT}`);
 });
