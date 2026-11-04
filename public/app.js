@@ -116,6 +116,7 @@ function showAppBasedOnRole() {
   const tabExec = document.getElementById('tab-executors');
   const tabUsers = document.getElementById('tab-users');
   const tabGalleryMgmt = document.getElementById('tab-gallery-mgmt');
+  const tabBon = document.getElementById('tab-bon-material');
   const btnTambahWO = document.getElementById('btnTambahWO');
   const btnAddExecutor = document.getElementById('btnAddExecutor');
   const btnTambahInvoice = document.getElementById('btnTambahInvoice');
@@ -126,6 +127,13 @@ function showAppBasedOnRole() {
   if (btnTambahInvoice) btnTambahInvoice.style.display = canManageInvoice ? 'flex' : 'none';
   if (btnInvoicePdfGenerator) btnInvoicePdfGenerator.style.display = canManageInvoice ? 'flex' : 'none';
 
+  // Hak akses bon material: Super Admin, Direktur, PM
+  canManageBon = currentUser && ['superadmin', 'direktur', 'pm'].includes(currentUser.role);
+  const btnCreateBon = document.getElementById('btnCreateBon');
+  const btnManageMaterials = document.getElementById('btnManageMaterials');
+  if (btnCreateBon) btnCreateBon.style.display = 'none';
+  if (btnManageMaterials) btnManageMaterials.style.display = canManageBon ? 'flex' : 'none';
+
   // Reset default
   tabDash.style.display = 'flex';
   tabProj.style.display = 'flex';
@@ -133,6 +141,7 @@ function showAppBasedOnRole() {
   tabExec.style.display = 'flex';
   if(tabUsers) tabUsers.style.display = 'none';
   if(tabGalleryMgmt) tabGalleryMgmt.style.display = 'none';
+  if(tabBon) tabBon.style.display = 'flex';
   if(btnTambahWO) btnTambahWO.style.display = 'flex';
   if(btnAddExecutor) btnAddExecutor.style.display = 'flex'; // Default show for allowed roles
 
@@ -146,6 +155,7 @@ function showAppBasedOnRole() {
   } else if (role === 'finance') {
     tabProj.style.display = 'none';
     tabExec.style.display = 'none';
+    if(tabBon) tabBon.style.display = 'none';
     const btnSubInflow = document.getElementById('btn-sub-inflow');
     if (btnSubInflow) btnSubInflow.style.display = 'flex';
     if(btnTambahWO) btnTambahWO.style.display = 'none';
@@ -175,7 +185,8 @@ async function loadAllData() {
     loadDashboardStats(),
     loadProjects(),
     loadInvoices(),
-    loadMandorPayouts()
+    loadMandorPayouts(),
+    loadMaterials()
   ];
   if (currentUser && currentUser.role === 'superadmin') {
     promises.push(loadUsers());
@@ -206,8 +217,11 @@ function switchTab(tabName) {
 
   if (tabName === 'dashboard') {
     loadDashboardStats();
+    renderMaterialStock();
   } else if (tabName === 'projects') {
     loadProjects();
+  } else if (tabName === 'bon-material') {
+    loadBonMaterialTab();
   } else if (tabName === 'finance') {
     loadInvoices();
     loadMandorPayouts();
@@ -1263,6 +1277,12 @@ async function submitExecutor(e) {
 // 8. GALLERY MANAGEMENT (SUPER ADMIN)
 // -------------------------------------------------------------
 let galleryData = [];
+let materialsData = [];
+let bonData = [];
+let currentBonId = null;
+let bonItemsDraft = [];
+let canManageBon = false;
+let materialStockChartInstance = null;
 
 
 const categoryBadgeMap = {
@@ -1571,4 +1591,389 @@ function exportInvoicesCSV() {
     return;
   }
   window.open(`/api/export/invoices-csv?token=${encodeURIComponent(token)}`, '_blank');
+}
+
+// -------------------------------------------------------------
+// 10. BON MATERIAL & STOK GUDANG
+// -------------------------------------------------------------
+async function loadMaterials() {
+  try {
+    const res = await fetch('/api/materials');
+    materialsData = await res.json();
+  } catch (err) {
+    console.error('Error loading materials:', err);
+  }
+}
+
+async function loadBonMaterials() {
+  try {
+    const res = await fetch('/api/bon-material');
+    bonData = await res.json();
+  } catch (err) {
+    console.error('Error loading bon material:', err);
+  }
+}
+
+async function loadBonMaterialTab() {
+  await Promise.all([loadMaterials(), loadBonMaterials()]);
+  populateBonWOSelect();
+  populateBonItemMaterialOptions();
+  renderMaterialsList();
+  onBonWOChange();
+}
+
+function populateBonWOSelect() {
+  const select = document.getElementById('bon-wo-select');
+  if (!select) return;
+  select.innerHTML = '<option value="">-- Pilih Work Order --</option>' + projectsData.map(p =>
+    `<option value="${p.id}">${p.wo_number} - ${p.cluster_name}</option>`
+  ).join('');
+}
+
+function onBonWOChange() {
+  const projId = document.getElementById('bon-wo-select').value;
+  const detail = document.getElementById('bon-detail-container');
+  const empty = document.getElementById('bon-empty-state');
+  const btnCreate = document.getElementById('btnCreateBon');
+  if (!projId) {
+    detail.classList.add('hidden');
+    empty.classList.remove('hidden');
+    if (btnCreate) btnCreate.style.display = 'none';
+    return;
+  }
+  empty.classList.add('hidden');
+  const bon = bonData.find(b => b.project_id === projId);
+  if (bon) {
+    renderBonDetail(bon);
+  } else {
+    detail.classList.add('hidden');
+    if (btnCreate) btnCreate.style.display = canManageBon ? 'flex' : 'none';
+  }
+}
+
+function renderBonDetail(bon) {
+  currentBonId = bon.id;
+  bonItemsDraft = bon.items.map(it => ({ ...it }));
+  const detail = document.getElementById('bon-detail-container');
+  const btnCreate = document.getElementById('btnCreateBon');
+  detail.classList.remove('hidden');
+  if (btnCreate) btnCreate.style.display = 'none';
+  document.getElementById('bon-detail-wo').textContent = `${bon.wo_number} — Bon Material`;
+  document.getElementById('bon-detail-meta').textContent =
+    `Dibuat: ${bon.created_at} • Diupdate: ${bon.updated_at} • ${bon.items.length} item`;
+  document.getElementById('bon-status-select').value = bon.status;
+  renderBonItems();
+  if (window.lucide) lucide.createIcons();
+}
+
+function renderBonItems() {
+  const container = document.getElementById('bon-items-container');
+  const addRow = document.getElementById('bon-add-item-row');
+  const btnSave = document.getElementById('btnSaveBon');
+  if (canManageBon) {
+    addRow.style.display = 'flex';
+    btnSave.style.display = 'flex';
+  } else {
+    addRow.style.display = 'none';
+    btnSave.style.display = 'none';
+  }
+
+  if (bonItemsDraft.length === 0) {
+    container.innerHTML = `
+      <div class="text-center py-8 text-slate-400">
+        <p class="text-xs">Belum ada material di bon ini.</p>
+      </div>`;
+    return;
+  }
+
+  const qtyCell = (item, field) => canManageBon
+    ? `<input type="number" min="0" value="${item[field]}" onchange="onBonQtyChange('${item.id}', '${field}', this.value)" class="w-20 text-xs border border-slate-300 rounded-lg px-2 py-1 text-center">`
+    : `<span class="font-semibold text-slate-800">${item[field]}</span>`;
+
+  container.innerHTML = `
+    <table class="w-full text-left text-xs border border-slate-200 rounded-xl overflow-hidden">
+      <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase">
+        <tr>
+          <th class="p-3">Material</th>
+          <th class="p-3">Kategori</th>
+          <th class="p-3 text-center">Satuan</th>
+          <th class="p-3 text-center">Rencana</th>
+          <th class="p-3 text-center">Datang</th>
+          <th class="p-3 text-center">Terpakai</th>
+          <th class="p-3 text-center">Sisa</th>
+          ${canManageBon ? '<th class="p-3"></th>' : ''}
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        ${bonItemsDraft.map(it => `
+          <tr class="hover:bg-slate-50">
+            <td class="p-3 font-semibold text-slate-800">${it.name}${it.variant ? ` <span class="text-slate-400">(${it.variant})</span>` : ''}</td>
+            <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800">${it.category}</span></td>
+            <td class="p-3 text-center">${it.unit}</td>
+            <td class="p-3 text-center">${qtyCell(it, 'qty_planned')}</td>
+            <td class="p-3 text-center">${qtyCell(it, 'qty_arrived')}</td>
+            <td class="p-3 text-center">${qtyCell(it, 'qty_used')}</td>
+            <td class="p-3 text-center font-bold ${it.qty_remaining < 0 ? 'text-red-600' : 'text-emerald-600'}">${it.qty_remaining}</td>
+            ${canManageBon ? `<td class="p-3 text-center"><button onclick="removeBonItem('${it.id}')" class="text-red-500 hover:text-red-700" title="Hapus item"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></td>` : ''}
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+  if (window.lucide) lucide.createIcons();
+}
+
+function onBonQtyChange(itemId, field, value) {
+  const item = bonItemsDraft.find(it => it.id === itemId);
+  if (!item) return;
+  item[field] = Number(value) || 0;
+  if (field === 'qty_arrived' || field === 'qty_used') {
+    item.qty_remaining = item.qty_arrived - item.qty_used;
+  }
+  renderBonItems();
+}
+
+function removeBonItem(itemId) {
+  bonItemsDraft = bonItemsDraft.filter(it => it.id !== itemId);
+  renderBonItems();
+}
+
+function populateBonItemMaterialOptions() {
+  const select = document.getElementById('bon-item-material');
+  if (!select) return;
+  const grouped = {};
+  materialsData.forEach(m => {
+    if (!grouped[m.category]) grouped[m.category] = [];
+    grouped[m.category].push(m);
+  });
+  let html = '<option value="">-- Pilih material --</option>';
+  Object.keys(grouped).forEach(cat => {
+    html += `<optgroup label="${cat}">` + grouped[cat].map(m =>
+      `<option value="${m.id}" data-name="${m.name}" data-category="${m.category}" data-variant="${m.variant}" data-unit="${m.unit}">${m.name}${m.variant ? ' - ' + m.variant : ''} (${m.unit}) — stok gudang: ${Number(m.stock_qty) || 0}</option>`
+    ).join('') + '</optgroup>';
+  });
+  select.innerHTML = html;
+}
+
+function addBonItem() {
+  const select = document.getElementById('bon-item-material');
+  const opt = select.selectedOptions[0];
+  const planned = Number(document.getElementById('bon-item-planned').value) || 0;
+  if (!opt || !opt.value) { alert('Pilih material dulu.'); return; }
+  bonItemsDraft.push({
+    id: 'boni-' + Date.now(),
+    material_id: opt.value,
+    name: opt.dataset.name,
+    category: opt.dataset.category,
+    variant: opt.dataset.variant,
+    unit: opt.dataset.unit,
+    qty_planned: planned,
+    qty_arrived: 0,
+    qty_used: 0,
+    qty_remaining: 0
+  });
+  select.value = '';
+  document.getElementById('bon-item-planned').value = '';
+  renderBonItems();
+}
+
+async function saveCurrentBon() {
+  if (!currentBonId) return;
+  const res = await fetch(`/api/bon-material/${currentBonId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items: bonItemsDraft })
+  });
+  const data = await res.json();
+  if (res.ok) {
+    alert('Bon material berhasil disimpan.');
+    await loadBonMaterials();
+    renderBonDetail(data.bon);
+  } else {
+    alert(data.message || 'Gagal menyimpan bon material.');
+  }
+}
+
+async function updateBonStatus() {
+  if (!currentBonId) return;
+  const status = document.getElementById('bon-status-select').value;
+  const res = await fetch(`/api/bon-material/${currentBonId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status })
+  });
+  if (res.ok) {
+    await loadBonMaterials();
+  } else {
+    alert('Gagal mengupdate status bon.');
+  }
+}
+
+async function createBonForSelectedWO() {
+  const projId = document.getElementById('bon-wo-select').value;
+  if (!projId) { alert('Pilih Work Order dulu.'); return; }
+  const res = await fetch('/api/bon-material', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ project_id: projId })
+  });
+  const data = await res.json();
+  if (res.ok || res.status === 409) {
+    await loadBonMaterials();
+    const bon = bonData.find(b => b.project_id === projId) || data.bon;
+    if (bon) renderBonDetail(bon);
+  } else {
+    alert(data.message || 'Gagal membuat bon material.');
+  }
+}
+
+function renderMaterialsList() {
+  const container = document.getElementById('materials-list');
+  if (!container) return;
+  const canDelete = currentUser && ['superadmin', 'direktur'].includes(currentUser.role);
+  container.innerHTML = materialsData.map(m => `
+    <div class="flex justify-between items-center p-3 rounded-lg border border-slate-200 bg-slate-50/50">
+      <div>
+        <p class="text-xs font-semibold text-slate-800">${m.name}${m.variant ? ` <span class="text-slate-400">(${m.variant})</span>` : ''}</p>
+        <p class="text-[10px] text-slate-500">${m.category} • satuan: ${m.unit} • stok: ${Number(m.stock_qty) || 0} ${m.is_custom ? '• custom' : '• standar'}</p>
+      </div>
+      <div class="flex items-center gap-2">
+        ${canManageBon ? `<button onclick="editMaterial('${m.id}')" class="text-sky-600 hover:text-sky-800" title="Edit"><i data-lucide="edit" class="w-3.5 h-3.5"></i></button>` : ''}
+        ${canDelete ? `<button onclick="deleteMaterial('${m.id}')" class="text-red-500 hover:text-red-700" title="Hapus"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` : ''}
+      </div>
+    </div>
+  `).join('');
+  if (window.lucide) lucide.createIcons();
+}
+
+function editMaterial(id) {
+  const m = materialsData.find(x => x.id === id);
+  if (!m) return;
+  document.getElementById('edit-mat-id').value = m.id;
+  document.getElementById('new-mat-name').value = m.name;
+  document.getElementById('new-mat-category').value = m.category;
+  document.getElementById('new-mat-variant').value = m.variant || '';
+  document.getElementById('new-mat-unit').value = m.unit || '';
+  document.getElementById('new-mat-stock').value = m.stock_qty || 0;
+  document.getElementById('new-mat-min').value = m.min_stock || 5;
+  document.getElementById('btn-submit-material').textContent = 'Simpan';
+  document.getElementById('btn-cancel-edit-material').classList.remove('hidden');
+}
+
+function cancelEditMaterial() {
+  document.getElementById('edit-mat-id').value = '';
+  document.getElementById('new-mat-name').value = '';
+  document.getElementById('new-mat-variant').value = '';
+  document.getElementById('new-mat-unit').value = '';
+  document.getElementById('new-mat-stock').value = '';
+  document.getElementById('new-mat-min').value = '';
+  document.getElementById('btn-submit-material').textContent = '+';
+  document.getElementById('btn-cancel-edit-material').classList.add('hidden');
+}
+
+async function submitMaterialForm(event) {
+  event.preventDefault();
+  const editId = document.getElementById('edit-mat-id').value;
+  const payload = {
+    name: document.getElementById('new-mat-name').value,
+    category: document.getElementById('new-mat-category').value,
+    variant: document.getElementById('new-mat-variant').value,
+    unit: document.getElementById('new-mat-unit').value,
+    stock_qty: Number(document.getElementById('new-mat-stock').value) || 0,
+    min_stock: Number(document.getElementById('new-mat-min').value) || 5
+  };
+  const res = await fetch(editId ? `/api/materials/${editId}` : '/api/materials', {
+    method: editId ? 'PUT' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (res.ok) {
+    cancelEditMaterial();
+    await loadMaterials();
+    renderMaterialsList();
+    populateBonItemMaterialOptions();
+  } else {
+    alert(data.message || 'Gagal menyimpan material.');
+  }
+}
+
+async function deleteMaterial(id) {
+  if (!confirm('Hapus material ini dari master?')) return;
+  const res = await fetch(`/api/materials/${id}`, { method: 'DELETE' });
+  if (res.ok) {
+    await loadMaterials();
+    renderMaterialsList();
+    populateBonItemMaterialOptions();
+  } else {
+    alert('Gagal menghapus material.');
+  }
+}
+
+// --- Widget stok gudang di Executive Dashboard ---
+function renderMaterialStock() {
+  const summary = document.getElementById('material-stock-summary');
+  const list = document.getElementById('material-stock-list');
+  const ctx = document.getElementById('materialStockChart');
+  if (!summary || !list || !ctx) return;
+
+  const totalTypes = materialsData.length;
+  const totalUnits = materialsData.reduce((sum, m) => sum + (Number(m.stock_qty) || 0), 0);
+  const lowCount = materialsData.filter(m => (Number(m.stock_qty) || 0) < (Number(m.min_stock) || 5)).length;
+
+  summary.innerHTML = `
+    <span class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded font-medium">${totalTypes} tipe material</span>
+    <span class="text-xs bg-sky-100 text-sky-700 px-2.5 py-1 rounded font-medium">${totalUnits} unit di gudang</span>
+    <span class="text-xs ${lowCount > 0 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'} px-2.5 py-1 rounded font-medium">${lowCount} material perlu restock</span>
+  `;
+
+  // Diagram: total stok per kategori
+  const cats = {};
+  materialsData.forEach(m => {
+    const c = m.category || 'Lainnya';
+    cats[c] = (cats[c] || 0) + (Number(m.stock_qty) || 0);
+  });
+  if (materialStockChartInstance) materialStockChartInstance.destroy();
+  materialStockChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: Object.keys(cats),
+      datasets: [{
+        label: 'Stok Gudang',
+        data: Object.values(cats),
+        backgroundColor: ['#0ea5e9', '#10b981', '#f59e0b', '#6366f1', '#ec4899', '#64748b'],
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+
+  // List per-material: stok paling sedikit di atas
+  const sorted = [...materialsData].sort((a, b) => (Number(a.stock_qty) || 0) - (Number(b.stock_qty) || 0));
+  list.innerHTML = sorted.map(m => {
+    const stock = Number(m.stock_qty) || 0;
+    const min = Number(m.min_stock) || 5;
+    const badge = stock === 0
+      ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800">Habis</span>'
+      : stock < min
+        ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">Rendah</span>'
+        : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">Aman</span>';
+    return `
+      <div class="flex justify-between items-center p-2.5 rounded-lg border border-slate-100 bg-slate-50/50">
+        <div class="min-w-0">
+          <p class="text-xs font-semibold text-slate-800 truncate">${m.name}${m.variant ? ` <span class="text-slate-400">(${m.variant})</span>` : ''}</p>
+          <p class="text-[10px] text-slate-500">${m.category} • min ${min}</p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          ${badge}
+          <span class="text-xs font-bold text-slate-900 w-20 text-right">${stock} ${m.unit}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
