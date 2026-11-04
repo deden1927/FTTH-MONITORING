@@ -3,7 +3,6 @@ let currentTab = 'dashboard';
 let currentFinanceSubTab = 'inflow';
 let projectsData = [];
 let executorsData = [];
-let drumsData = [];
 let revenueChartInstance = null;
 let clientChartInstance = null;
 let currentUser = null;
@@ -113,7 +112,6 @@ function showAppBasedOnRole() {
   
   const tabDash = document.getElementById('tab-dashboard');
   const tabProj = document.getElementById('tab-projects');
-  const tabBoq = document.getElementById('tab-boq');
   const tabFin = document.getElementById('tab-finance');
   const tabExec = document.getElementById('tab-executors');
   const tabUsers = document.getElementById('tab-users');
@@ -131,7 +129,6 @@ function showAppBasedOnRole() {
   // Reset default
   tabDash.style.display = 'flex';
   tabProj.style.display = 'flex';
-  tabBoq.style.display = 'flex';
   tabFin.style.display = 'flex';
   tabExec.style.display = 'flex';
   if(tabUsers) tabUsers.style.display = 'none';
@@ -148,7 +145,6 @@ function showAppBasedOnRole() {
     switchTab('projects');
   } else if (role === 'finance') {
     tabProj.style.display = 'none';
-    tabBoq.style.display = 'none';
     tabExec.style.display = 'none';
     const btnSubInflow = document.getElementById('btn-sub-inflow');
     if (btnSubInflow) btnSubInflow.style.display = 'flex';
@@ -178,7 +174,6 @@ async function loadAllData() {
     loadExecutors(),
     loadDashboardStats(),
     loadProjects(),
-    loadDrums(),
     loadInvoices(),
     loadMandorPayouts()
   ];
@@ -213,8 +208,6 @@ function switchTab(tabName) {
     loadDashboardStats();
   } else if (tabName === 'projects') {
     loadProjects();
-  } else if (tabName === 'boq') {
-    populateBOQProjectSelect();
   } else if (tabName === 'finance') {
     loadInvoices();
     loadMandorPayouts();
@@ -486,7 +479,6 @@ async function loadProjects() {
     const res = await fetch(url);
     projectsData = await res.json();
     renderProjectsList();
-    populateBOQProjectSelect();
   } catch (err) {
     console.error('Error loading projects:', err);
   }
@@ -545,9 +537,6 @@ function renderProjectsList() {
                 Laba Kotor: ${formatIDR(proj.gross_margin)} (${proj.margin_percent}%)
               </div>
             </div>
-            <button onclick="openBOQForProject('${proj.id}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-3 py-2.5 rounded-lg border border-slate-300 transition flex items-center gap-1">
-              <i data-lucide="calculator" class="w-3.5 h-3.5"></i> BOQ
-            </button>
             <button onclick="deleteProject('${proj.id}', '${proj.wo_number}')" title="Hapus Work Order" class="bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 text-xs font-semibold px-2.5 py-2.5 rounded-lg border border-red-200 transition flex items-center gap-1">
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             </button>
@@ -577,7 +566,7 @@ function renderProjectsList() {
 }
 
 async function deleteProject(projId, woNumber) {
-  if (!confirm(`Apakah Anda yakin ingin menghapus Work Order ${woNumber}?\n\nPerhatian: Seluruh milestone pengerjaan, data BOQ, invoice termin, dan klaim mandor terkait proyek ini akan ikut dihapus secara permanen.`)) {
+  if (!confirm(`Apakah Anda yakin ingin menghapus Work Order ${woNumber}?\n\nPerhatian: Seluruh milestone pengerjaan, invoice termin, dan klaim mandor terkait proyek ini akan ikut dihapus secara permanen.`)) {
     return;
   }
 
@@ -588,10 +577,8 @@ async function deleteProject(projId, woNumber) {
     if (res.ok) {
       await loadProjects();
       await loadDashboardStats();
-      await loadDrums();
       await loadInvoices();
       await loadMandorPayouts();
-      populateBOQProjectSelect();
     } else {
       alert('Gagal menghapus Work Order.');
     }
@@ -657,157 +644,6 @@ function renderMilestoneCard(m, proj) {
 function escapeQuote(str) {
   if (!str) return '';
   return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-}
-
-// -------------------------------------------------------------
-// 3. BOQ & DRUMS
-// -------------------------------------------------------------
-async function loadDrums() {
-  try {
-    const res = await fetch('/api/drums');
-    drumsData = await res.json();
-    renderDrumsList();
-  } catch (err) {
-    console.error('Error loading drums:', err);
-  }
-}
-
-function renderDrumsList() {
-  const container = document.getElementById('drums-container');
-  if (!container) return;
-
-  container.innerHTML = drumsData.map(d => {
-    const usedPct = Math.round((d.used_meters / d.initial_meters) * 100);
-    const isWarning = d.remaining_meters < 300 && d.remaining_meters > 0;
-    
-    return `
-      <div class="p-4 rounded-xl border ${isWarning ? 'border-amber-300 bg-amber-50/30' : 'border-slate-200 bg-slate-50/50'}">
-        <div class="flex justify-between items-start mb-2">
-          <div>
-            <span class="font-mono font-bold text-sm text-slate-900">${d.id}</span>
-            <p class="text-xs text-slate-500">${d.cable_type}</p>
-          </div>
-          <span class="text-[10px] px-2 py-0.5 rounded font-bold ${d.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}">${d.status}</span>
-        </div>
-
-        <div class="space-y-1 my-2">
-          <div class="flex justify-between text-xs font-semibold">
-            <span class="text-slate-600">Terpakai: ${d.used_meters} m</span>
-            <span class="text-slate-900">Sisa: ${d.remaining_meters} m</span>
-          </div>
-          <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-            <div class="${isWarning ? 'bg-amber-500' : 'bg-sky-600'} h-2 rounded-full" style="width: ${usedPct}%"></div>
-          </div>
-        </div>
-
-        <p class="text-[11px] text-slate-500 mt-1">Alokasi SP: <span class="font-semibold text-slate-700">${d.allocated_to}</span></p>
-      </div>
-    `;
-  }).join('');
-  if (window.lucide) lucide.createIcons();
-}
-
-function populateBOQProjectSelect() {
-  const select = document.getElementById('boq-project-select');
-  if (!select) return;
-
-  if (projectsData.length === 0) {
-    select.innerHTML = '<option value="">Belum ada proyek</option>';
-    return;
-  }
-
-  select.innerHTML = projectsData.map(p => `
-    <option value="${p.id}">${p.wo_number} - ${p.cluster_name} (${p.client_name})</option>
-  `).join('');
-
-  loadBOQForSelectedProject();
-}
-
-function openBOQForProject(projId) {
-  switchTab('boq');
-  const select = document.getElementById('boq-project-select');
-  if (select) {
-    select.value = projId;
-    loadBOQForSelectedProject();
-  }
-}
-
-async function loadBOQForSelectedProject() {
-  const projId = document.getElementById('boq-project-select')?.value;
-  const container = document.getElementById('boq-detail-container');
-  if (!projId || !container) return;
-
-  const project = projectsData.find(p => p.id === projId);
-  try {
-    const res = await fetch(`/api/boq/${projId}`);
-    const items = await res.json();
-
-    if (items.length === 0) {
-      container.innerHTML = `
-        <div class="text-center py-8 text-slate-400">
-          <p class="text-xs">Belum ada rincian BOQ tersimpan untuk proyek ini.</p>
-        </div>
-      `;
-      return;
-    }
-
-    let totalClientRevenue = 0;
-    let totalMandorCost = 0;
-
-    const rows = items.map(it => {
-      const subClient = it.actual_qty * it.client_rate;
-      const subMandor = it.actual_qty * it.mandor_rate;
-      const margin = subClient - subMandor;
-      totalClientRevenue += subClient;
-      totalMandorCost += subMandor;
-
-      return `
-        <tr class="hover:bg-slate-50 text-xs">
-          <td class="p-3">
-            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${it.item_type === 'Material' ? 'bg-sky-100 text-sky-800' : 'bg-indigo-100 text-indigo-800'}">${it.item_type}</span>
-          </td>
-          <td class="p-3 font-semibold text-slate-800">${it.name}</td>
-          <td class="p-3 text-center">${it.planned_qty} ${it.unit}</td>
-          <td class="p-3 text-center font-bold text-slate-900">${it.actual_qty} ${it.unit}</td>
-          <td class="p-3 text-right">${formatIDR(it.client_rate)}</td>
-          <td class="p-3 text-right text-amber-700">${it.mandor_rate > 0 ? formatIDR(it.mandor_rate) : '-'}</td>
-          <td class="p-3 text-right font-bold text-slate-900">${formatIDR(subClient)}</td>
-          <td class="p-3 text-right font-bold text-emerald-600">${formatIDR(margin)}</td>
-        </tr>
-      `;
-    }).join('');
-
-    const totalMargin = totalClientRevenue - totalMandorCost;
-
-    container.innerHTML = `
-      <table class="w-full text-left text-xs border border-slate-200 rounded-xl overflow-hidden">
-        <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase">
-          <tr>
-            <th class="p-3">Kategori</th>
-            <th class="p-3">Deskripsi Item</th>
-            <th class="p-3 text-center">Vol SPK</th>
-            <th class="p-3 text-center">Realisasi</th>
-            <th class="p-3 text-right">Tarif Klien</th>
-            <th class="p-3 text-right">Upah Mandor</th>
-            <th class="p-3 text-right">Subtotal Klien</th>
-            <th class="p-3 text-right">Gross Margin</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          ${rows}
-        </tbody>
-        <tfoot class="bg-slate-50 font-bold border-t-2 border-slate-300 text-xs">
-          <tr>
-            <td colspan="6" class="p-3 text-right">TOTAL REALISASI:</td>
-            <td class="p-3 text-right text-slate-900">${formatIDR(totalClientRevenue)}</td>
-            <td class="p-3 text-right text-emerald-600">${formatIDR(totalMargin)}</td>
-          </tr>
-        </tfoot>
-      </table>
-    `;
-  } catch (err) {
-    console.error('Error loading BOQ:', err);
-  }
 }
 
 // -------------------------------------------------------------

@@ -121,10 +121,7 @@
           <i data-lucide="clipboard-list" class="w-4 h-4"></i>
           <span>Manajemen WO & Lapangan</span>
         </button>
-        <button onclick="switchTab('boq')" id="tab-boq" class="nav-tab flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md transition text-slate-400 hover:text-white hover:bg-slate-700/50">
-          <i data-lucide="calculator" class="w-4 h-4"></i>
-          <span>Kontrol BOQ & Drum Kabel</span>
-        </button>
+
         <button onclick="switchTab('finance')" id="tab-finance" class="nav-tab flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md transition text-slate-400 hover:text-white hover:bg-slate-700/50">
           <i data-lucide="wallet" class="w-4 h-4"></i>
           <span>Cashflow 2 Arah (Klien & Mandor)</span>
@@ -373,53 +370,6 @@
       <!-- Projects Container -->
       <div id="projects-container" class="space-y-6">
         <!-- Dynamically populated project cards with 4 milestone cards -->
-      </div>
-
-    </div>
-
-    <!-- ============================================================= -->
-    <!-- TAB 3: KONTROL BOQ & DRUM KABEL                               -->
-    <!-- ============================================================= -->
-    <div id="content-boq" class="tab-content hidden space-y-6">
-      
-      <!-- Drum Cable Widget -->
-      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h2 class="font-bold text-base text-slate-900 flex items-center gap-2">
-              <i data-lucide="disc" class="w-5 h-5 text-sky-600"></i>
-              <span>Manajemen Drum Kabel Fiber Optik (Cegah Waste)</span>
-            </h2>
-            <p class="text-xs text-slate-500">Pelacakan sisa meteran kabel pada drum teralokasi agar tidak ada potongan pendek yang terbuang percuma.</p>
-          </div>
-        </div>
-
-        <div id="drums-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <!-- Dynamically populated drums -->
-        </div>
-      </div>
-
-      <!-- BOQ Explorer by Project -->
-      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
-          <div>
-            <h2 class="font-bold text-base text-slate-900 flex items-center gap-2">
-              <i data-lucide="file-spreadsheet" class="w-5 h-5 text-emerald-600"></i>
-              <span>Detail BOQ & Komparasi Rencana vs Realisasi</span>
-            </h2>
-            <p class="text-xs text-slate-500">Pilih proyek untuk melihat rincian BOQ Material & Jasa, harga kontrak klien, dan biaya borongan mandor.</p>
-          </div>
-          <div>
-            <select id="boq-project-select" onchange="loadBOQForSelectedProject()" class="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 font-medium">
-              <!-- Dynamically populated -->
-            </select>
-          </div>
-        </div>
-
-        <!-- BOQ Summary & Table -->
-        <div id="boq-detail-container" class="overflow-x-auto">
-          <!-- Dynamically populated BOQ Table -->
-        </div>
       </div>
 
     </div>
