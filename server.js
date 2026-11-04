@@ -65,13 +65,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 function readDB() {
   try {
     if (!fs.existsSync(DB_FILE)) {
-      return { projects: [], executors: [], milestones: [], boq_items: [], drums: [], invoices: [], mandor_payouts: [], gallery: [], users: [] };
+      return { projects: [], executors: [], milestones: [], invoices: [], mandor_payouts: [], gallery: [], users: [] };
     }
     const raw = fs.readFileSync(DB_FILE, 'utf8');
     return JSON.parse(raw);
   } catch (err) {
     console.error('Error reading database:', err.message);
-    return { projects: [], executors: [], milestones: [], boq_items: [], drums: [], invoices: [], mandor_payouts: [], gallery: [], users: [] };
+    return { projects: [], executors: [], milestones: [], invoices: [], mandor_payouts: [], gallery: [], users: [] };
   }
 }
 
@@ -464,7 +464,6 @@ app.delete('/api/projects/:id', authenticateToken, requireRoles(['direktur', 'su
 
   const deletedProject = db.projects.splice(pIndex, 1)[0];
   db.milestones = (db.milestones || []).filter(m => m.project_id !== pId);
-  db.boq_items = (db.boq_items || []).filter(b => b.project_id !== pId);
   db.invoices = (db.invoices || []).filter(inv => inv.project_id !== pId);
   db.mandor_payouts = (db.mandor_payouts || []).filter(mp => mp.project_id !== pId);
 
@@ -525,41 +524,6 @@ app.put('/api/milestones/:id', authenticateToken, requireRoles(['pm', 'superadmi
 
   writeDB(db);
   res.json(db.milestones[mIndex]);
-});
-
-// -------------------------------------------------------------
-// 10. BOQ & DRUMS API
-// -------------------------------------------------------------
-app.get('/api/boq/:projectId', authenticateToken, (req, res) => {
-  const db = readDB();
-  const items = (db.boq_items || []).filter(b => b.project_id === req.params.projectId);
-  res.json(items);
-});
-
-app.post('/api/boq/:projectId', authenticateToken, requireRoles(['direktur', 'superadmin', 'pm']), (req, res) => {
-  const db = readDB();
-  if (!db.boq_items) db.boq_items = [];
-
-  const newItem = {
-    id: 'boq-' + Date.now(),
-    project_id: req.params.projectId,
-    item_type: req.body.item_type || 'Jasa',
-    name: String(req.body.name || '').trim(),
-    unit: req.body.unit || 'Meter',
-    planned_qty: Number(req.body.planned_qty) || 0,
-    actual_qty: Number(req.body.actual_qty) || 0,
-    client_rate: Number(req.body.client_rate) || 0,
-    mandor_rate: Number(req.body.mandor_rate) || 0
-  };
-
-  db.boq_items.push(newItem);
-  writeDB(db);
-  res.status(201).json(newItem);
-});
-
-app.get('/api/drums', authenticateToken, (req, res) => {
-  const db = readDB();
-  res.json(db.drums || []);
 });
 
 // -------------------------------------------------------------
