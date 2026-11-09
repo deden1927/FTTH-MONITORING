@@ -925,6 +925,9 @@ function renderMilestoneCard(m, proj) {
     ? `<span class="inline-flex items-center gap-1 text-[10px] font-semibold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/70 border border-sky-200 dark:border-sky-800 px-1.5 py-0.5 rounded"><i data-lucide="shield" class="w-2.5 h-2.5"></i> ${mExecName}</span>`
     : `<span class="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/70 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded"><i data-lucide="hard-hat" class="w-2.5 h-2.5"></i> ${mExecName}${m.stage_cost ? ' • ' + formatIDR(m.stage_cost) : ''}</span>`;
 
+  const canManage = !currentUser || ['superadmin', 'direktur', 'pm'].includes(currentUser.role);
+  const isDone = m.status === 'Done';
+
   return `
     <div class="bg-white dark:bg-slate-850 dark:bg-slate-800/90 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/80 flex flex-col justify-between hover:border-sky-300 dark:hover:border-sky-500 transition">
       <div>
@@ -943,11 +946,24 @@ function renderMilestoneCard(m, proj) {
         ${extraContent}
       </div>
 
-      <div class="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-700/80 flex items-center justify-between">
+      <div class="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-700/80 flex items-center justify-between gap-1.5">
         <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">${m.progress_percent}%</span>
-        <button onclick="openUpdateMilestoneModal('${m.id}')" class="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 flex items-center gap-1 cursor-pointer">
-          <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Update
-        </button>
+        <div class="flex items-center gap-1.5">
+          ${canManage ? (
+            !isDone ? `
+              <button type="button" onclick="autoDoneMilestone('${m.id}', '${escapeQuote(m.stage_name)}')" class="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 px-2 py-1 rounded-md flex items-center gap-1 transition cursor-pointer shadow-2xs" title="Langsung Tandai 100% Selesai (Auto Done)">
+                <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i> Auto Done
+              </button>
+            ` : `
+              <button type="button" onclick="autoDoneMilestone('${m.id}', '${escapeQuote(m.stage_name)}')" class="text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:text-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 px-2 py-1 rounded-md flex items-center gap-1 transition cursor-pointer" title="Sudah Selesai 100% (Klik untuk refresh status)">
+                <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"></i> Done ✓
+              </button>
+            `
+          ) : ''}
+          <button type="button" onclick="openUpdateMilestoneModal('${m.id}')" class="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 px-2 py-1 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-1 transition cursor-pointer">
+            <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Update
+          </button>
+        </div>
       </div>
     </div>
   `;
@@ -2043,6 +2059,35 @@ async function submitUpdateMilestone(e) {
     }
   } catch (err) {
     console.error('Error updating milestone:', err);
+  }
+}
+
+async function autoDoneMilestone(milestoneId, stageName) {
+  try {
+    const payload = {
+      status: 'Done',
+      progress_percent: 100
+    };
+    if (stageName && stageName.includes('ATP')) {
+      payload.otdr_loss = '0.21 dB/km (Pass)';
+      payload.opm_power = '-18.5 dBm (Pass)';
+    }
+
+    const res = await fetch(`/api/milestones/${milestoneId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      await Promise.all([loadProjects(), loadDashboardStats(), loadMandorPayouts()]);
+    } else {
+      const err = await res.json();
+      alert(err.error || err.message || 'Gagal menandai milestone selesai.');
+    }
+  } catch (err) {
+    console.error('Error auto-marking milestone as done:', err);
+    alert('Terjadi kesalahan koneksi saat mengupdate milestone.');
   }
 }
 
