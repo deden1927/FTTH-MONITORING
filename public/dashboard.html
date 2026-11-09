@@ -1,16 +1,33 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PT Akses Kwalitas Unggul - Monitoring & Keuangan Vendor FTTH</title>
   <link rel="icon" type="image/png" href="/images/logo.png">
-  <meta name="description" content="Dashboard Sistem Monitoring Pekerjaan & Keuangan Vendor FTTH PT Akses Kwalitas Unggul.">
+  <meta name="description"
+    content="Dashboard Sistem Monitoring Pekerjaan & Keuangan Vendor FTTH PT Akses Kwalitas Unggul.">
   <meta property="og:title" content="Dashboard Monitoring | PT Akses Kwalitas Unggul">
-  <meta property="og:description" content="Sistem monitoring pekerjaan dan keuangan vendor FTTH OSP PT Akses Kwalitas Unggul.">
+  <meta property="og:description"
+    content="Sistem monitoring pekerjaan dan keuangan vendor FTTH OSP PT Akses Kwalitas Unggul.">
   <meta property="og:image" content="https://akseskwalitasunggul.com/images/logo.png">
   <meta property="og:url" content="https://akseskwalitasunggul.com/dashboard.html">
   <meta property="og:type" content="website">
+  <!-- Theme Detection Script (Zero FOUC) -->
+  <script>
+    (function() {
+      try {
+        const savedTheme = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Chart.js CDN -->
@@ -19,6 +36,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script>
     tailwind.config = {
+      darkMode: 'class',
       theme: {
         extend: {
           colors: {
@@ -36,660 +54,1090 @@
     }
   </script>
   <style>
-    [x-cloak] { display: none !important; }
-    .status-badge-todo { background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
-    .status-badge-inprogress { background-color: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; }
-    .status-badge-blocked { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
-    .status-badge-done { background-color: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+    [x-cloak] {
+      display: none !important;
+    }
+
+    .status-badge-todo {
+      background-color: #f1f5f9;
+      color: #475569;
+      border: 1px solid #cbd5e1;
+    }
+
+    .status-badge-inprogress {
+      background-color: #e0f2fe;
+      color: #0369a1;
+      border: 1px solid #7dd3fc;
+    }
+
+    .status-badge-blocked {
+      background-color: #fee2e2;
+      color: #b91c1c;
+      border: 1px solid #fca5a5;
+    }
+
+    .status-badge-done {
+      background-color: #dcfce7;
+      color: #15803d;
+      border: 1px solid #86efac;
+    }
+
+    .dark .status-badge-todo {
+      background-color: #1e293b;
+      color: #94a3b8;
+      border: 1px solid #334155;
+    }
+
+    .dark .status-badge-inprogress {
+      background-color: #0c4a6e;
+      color: #38bdf8;
+      border: 1px solid #0284c7;
+    }
+
+    .dark .status-badge-blocked {
+      background-color: #450a0a;
+      color: #fca5a5;
+      border: 1px solid #991b1b;
+    }
+
+    .dark .status-badge-done {
+      background-color: #064e3b;
+      color: #6ee7b7;
+      border: 1px solid #059669;
+    }
+
+    /* Scoped Dark Mode Utilities */
+    .dark .bg-white {
+      background-color: #0f172a !important;
+    }
+    .dark .bg-slate-50,
+    .dark .bg-slate-50\/50,
+    .dark .bg-slate-50\/70,
+    .dark .bg-slate-100,
+    .dark .bg-slate-100\/60 {
+      background-color: #1e293b !important;
+    }
+    .dark .border-slate-100,
+    .dark .border-slate-200,
+    .dark .border-slate-200\/80,
+    .dark .border-slate-200\/90 {
+      border-color: #334155 !important;
+    }
+    .dark .border-slate-300 {
+      border-color: #475569 !important;
+    }
+    .dark .text-slate-900 {
+      color: #f8fafc !important;
+    }
+    .dark .text-slate-800 {
+      color: #e2e8f0 !important;
+    }
+    .dark .text-slate-700 {
+      color: #cbd5e1 !important;
+    }
+    .dark .text-slate-600 {
+      color: #94a3b8 !important;
+    }
+    .dark .text-slate-500 {
+      color: #64748b !important;
+    }
+    .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+    .dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+      border-color: #334155 !important;
+    }
+    .dark input:not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]),
+    .dark select,
+    .dark textarea {
+      background-color: #1e293b !important;
+      color: #f1f5f9 !important;
+      border-color: #475569 !important;
+    }
+    .dark input::placeholder,
+    .dark textarea::placeholder {
+      color: #64748b !important;
+    }
+    .dark tr:hover {
+      background-color: rgba(30, 41, 59, 0.7) !important;
+    }
   </style>
 </head>
-<body class="bg-slate-100 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans antialiased min-h-screen transition-colors duration-200">
 
   <!-- LOGIN CONTAINER -->
   <div id="login-container" class="flex-1 flex items-center justify-center min-h-screen bg-slate-900">
-    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
+    <div class="bg-white dark:bg-slate-900 p-8 rounded-xl shadow-2xl w-full max-w-md border border-transparent dark:border-slate-800">
       <div class="text-center mb-6">
-        <img src="/images/logo.png" alt="Logo PT Akses Kwalitas Unggul" class="h-20 w-auto object-contain mx-auto mb-4 drop-shadow-md">
-        <h2 class="text-2xl font-bold text-slate-800">PT Akses Kwalitas Unggul</h2>
-        <p class="text-sm text-slate-500">Sign in to continue</p>
+        <img src="/images/logo.png" alt="Logo PT Akses Kwalitas Unggul"
+          class="h-20 w-auto object-contain mx-auto mb-4 drop-shadow-md">
+        <h2 class="text-2xl font-bold text-slate-800 dark:text-slate-100">PT Akses Kwalitas Unggul</h2>
+        <p class="text-sm text-slate-500 dark:text-slate-400">Sign in to continue</p>
       </div>
       <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">Username</label>
-          <input type="text" id="loginUsername" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500" required>
+          <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Username</label>
+          <input type="text" id="loginUsername"
+            class="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+            required>
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">Password</label>
-          <input type="password" id="loginPassword" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500" required>
+          <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Password</label>
+          <input type="password" id="loginPassword"
+            class="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100"
+            required>
         </div>
         <div id="loginError" class="text-red-500 text-sm hidden text-center"></div>
-        <button type="submit" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-2.5 rounded-lg transition shadow-md">
+        <button type="submit"
+          class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-2.5 rounded-lg transition shadow-md cursor-pointer">
           Sign In
         </button>
       </form>
     </div>
   </div>
 
-  <!-- MAIN APP CONTAINER -->
-  <div id="app-container" style="display: none;" class="flex-1 flex flex-col">
-    <!-- TOP HEADER NAVBAR -->
-    <header class="bg-slate-900 text-white sticky top-0 z-40 shadow-lg border-b border-slate-800">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center space-x-3">
-        <img src="/images/logo.png" alt="Logo PT AKU" class="h-10 w-auto object-contain drop-shadow-sm">
-        <div>
-          <div class="flex items-center space-x-2">
-            <span class="font-bold text-lg tracking-wide text-white">PT Akses Kwalitas Unggul</span>
-            
-          </div>
-          <p class="text-xs text-slate-400">Telkom Akses • Icon Net (PLN) • ID Net</p>
-        </div>
-      </div>
+  <!-- MAIN APP CONTAINER (SIDEBAR + MAIN CONTENT) -->
+  <div id="app-container" style="display: none;" class="min-h-screen flex bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100">
 
-      <!-- Quick Action Buttons -->
-      <div class="flex items-center space-x-3">
-        <div class="flex items-center space-x-2 mr-2 border-r border-slate-700 pr-3">
-          <i data-lucide="user-circle" class="w-5 h-5 text-slate-400"></i>
-          <div class="flex flex-col">
-            <span id="userNameDisplay" class="text-xs font-semibold text-white"></span>
-            <span id="userRoleDisplay" class="text-[10px] text-sky-400 uppercase tracking-wider"></span>
+    <!-- MOBILE SIDEBAR BACKDROP -->
+    <div id="sidebar-backdrop" onclick="toggleSidebar(false)"
+      class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-40 hidden lg:hidden transition-opacity"></div>
+
+    <!-- SIDEBAR (LEFT) -->
+    <aside id="app-sidebar"
+      class="fixed lg:sticky top-0 inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white flex flex-col h-screen shrink-0 border-r border-slate-800 transform -translate-x-full lg:translate-x-0 transition-transform duration-200 ease-in-out select-none">
+
+      <!-- SIDEBAR BRAND / HEADER -->
+      <div class="h-16 px-4 flex items-center justify-between border-b border-slate-800 shrink-0">
+        <div class="flex items-center space-x-3 overflow-hidden">
+          <img src="/images/logo.png" alt="Logo PT AKU" class="h-9 w-auto object-contain shrink-0 drop-shadow-sm">
+          <div class="min-w-0">
+            <span class="font-bold text-sm tracking-wide text-white block truncate">PT AKU</span>
+            <span class="text-[10px] text-slate-400 block truncate">Monitoring & Keuangan</span>
           </div>
         </div>
-        <button onclick="openModal('modalAddProject')" id="btnTambahWO" class="flex items-center space-x-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition shadow">
-          <i data-lucide="plus-circle" class="w-4 h-4"></i>
-          <span>Tambah WO Baru</span>
-        </button>
-        <button onclick="exportProjectsCSV()" class="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-lg border border-slate-700 transition">
-          <i data-lucide="download" class="w-4 h-4"></i>
-          <span>Ekspor CSV</span>
-        </button>
-        <button onclick="handleLogout()" class="flex items-center space-x-1.5 bg-red-900/50 hover:bg-red-800 text-red-200 hover:text-white text-xs font-semibold px-3 py-2 rounded-lg transition border border-red-800/50">
-          <i data-lucide="log-out" class="w-4 h-4"></i>
-          <span>Logout</span>
+        <!-- Close button for mobile -->
+        <button onclick="toggleSidebar(false)"
+          class="lg:hidden p-1.5 text-slate-400 hover:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer"
+          aria-label="Tutup navigasi">
+          <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
-    </div>
 
-    <!-- NAVIGATION TABS -->
-    <div class="bg-slate-800/90 border-t border-slate-700/60 px-4 sm:px-6 lg:px-8">
-      <div class="max-w-7xl mx-auto flex space-x-1 overflow-x-auto py-1">
-        <button onclick="switchTab('bon-material')" id="tab-bon-material" class="nav-tab flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md transition text-slate-400 hover:text-white hover:bg-slate-700/50">
-          <i data-lucide="package" class="w-4 h-4"></i>
-          <span>Bon Material</span>
-        </button>
-        <button onclick="switchTab('dashboard')" id="tab-dashboard" class="nav-tab active flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md transition text-sky-400 bg-slate-900 border border-slate-700">
-          <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
-          <span>Executive Dashboard (Bos)</span>
-        </button>
-        <button onclick="switchTab('projects')" id="tab-projects" class="nav-tab flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md transition text-slate-400 hover:text-white hover:bg-slate-700/50">
-          <i data-lucide="clipboard-list" class="w-4 h-4"></i>
-          <span>Manajemen WO & Lapangan</span>
-        </button>
+      <!-- SIDEBAR NAVIGATION LINKS (SCROLLABLE & GROUPED) -->
+      <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-6 focus:outline-none" aria-label="Navigasi Utama">
 
-        <button onclick="switchTab('finance')" id="tab-finance" class="nav-tab flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md transition text-slate-400 hover:text-white hover:bg-slate-700/50">
-          <i data-lucide="wallet" class="w-4 h-4"></i>
-          <span>Cashflow 2 Arah (Klien & Mandor)</span>
-        </button>
-        <button onclick="switchTab('executors')" id="tab-executors" class="nav-tab flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md transition text-slate-400 hover:text-white hover:bg-slate-700/50">
-          <i data-lucide="users" class="w-4 h-4"></i>
-          <span>Master Eksekutor</span>
-        </button>
-        <button onclick="switchTab('users')" id="tab-users" class="nav-tab flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md transition text-slate-400 hover:text-white hover:bg-slate-700/50" style="display: none;">
-          <i data-lucide="shield" class="w-4 h-4"></i>
-          <span>Manajemen User (Admin)</span>
-        </button>
-        <button onclick="switchTab('gallery-mgmt')" id="tab-gallery-mgmt" class="nav-tab flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md transition text-slate-400 hover:text-white hover:bg-slate-700/50" style="display: none;">
-          <i data-lucide="image" class="w-4 h-4"></i>
-          <span>Kelola Galeri Index</span>
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <!-- MAIN CONTAINER -->
-  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-
-    <!-- ============================================================= -->
-    <!-- TAB: BON MATERIAL (PENGELOLAAN MATERIAL PER WO)               -->
-    <!-- ============================================================= -->
-    <div id="content-bon-material" class="tab-content hidden space-y-6">
-
-      <!-- Header + WO Selector -->
-      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h2 class="font-bold text-base text-slate-900 flex items-center gap-2">
-              <i data-lucide="package" class="w-5 h-5 text-sky-600"></i>
-              <span>Bon Material per Work Order</span>
-            </h2>
-            <p class="text-xs text-slate-500">Setiap WO disertai bon material. Pantau material rencana, sudah datang, terpakai, dan sisa.</p>
+        <!-- GROUP: OVERVIEW -->
+        <div id="nav-group-overview" class="space-y-1">
+          <div class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+            Overview
           </div>
-          <div class="flex items-center gap-2">
-            <select id="bon-wo-select" onchange="onBonWOChange()" class="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 font-medium min-w-[260px]">
-              <option value="">-- Pilih Work Order --</option>
-            </select>
-            <button id="btnCreateBon" onclick="createBonForSelectedWO()" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-4 py-2 rounded-lg items-center gap-1.5 shadow" style="display: none;">
-              <i data-lucide="plus" class="w-4 h-4"></i> Buat Bon Baru
-            </button>
-            <button id="btnManageMaterials" onclick="openModal('modalManageMaterials'); renderMaterialsList();" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-4 py-2 rounded-lg items-center gap-1.5 border border-slate-300" style="display: none;">
-              <i data-lucide="settings" class="w-4 h-4"></i> Kelola Material
-            </button>
-          </div>
+          <button onclick="handleNavClick('dashboard')" id="tab-dashboard"
+            class="nav-tab w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium transition text-sky-400 bg-slate-800 border border-slate-700/80 cursor-pointer text-left">
+            <i data-lucide="layout-dashboard" class="w-4 h-4 shrink-0"></i>
+            <span class="truncate">Executive Dashboard</span>
+          </button>
         </div>
-      </div>
 
-      <!-- Bon Detail -->
-      <div id="bon-detail-container" class="hidden space-y-6">
-        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-4">
-            <div>
-              <h3 id="bon-detail-wo" class="font-bold text-slate-900 text-sm"></h3>
-              <p id="bon-detail-meta" class="text-xs text-slate-500"></p>
+        <!-- GROUP: OPERASIONAL FTTH -->
+        <div id="nav-group-operasional" class="space-y-1">
+          <div class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+            Operasional FTTH
+          </div>
+          <button onclick="handleNavClick('projects')" id="tab-projects"
+            class="nav-tab w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer text-left">
+            <i data-lucide="clipboard-list" class="w-4 h-4 shrink-0"></i>
+            <span class="truncate">Manajemen WO & Lapangan</span>
+          </button>
+          <button onclick="handleNavClick('bon-material')" id="tab-bon-material"
+            class="nav-tab w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer text-left">
+            <i data-lucide="package" class="w-4 h-4 shrink-0"></i>
+            <span class="truncate">Bon Material</span>
+          </button>
+          <button onclick="handleNavClick('executors')" id="tab-executors"
+            class="nav-tab w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer text-left">
+            <i data-lucide="users" class="w-4 h-4 shrink-0"></i>
+            <span class="truncate">Master Eksekutor</span>
+          </button>
+        </div>
+
+        <!-- GROUP: FINANSIAL -->
+        <div id="nav-group-finansial" class="space-y-1">
+          <div class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+            Finansial
+          </div>
+          <button onclick="handleNavClick('finance')" id="tab-finance"
+            class="nav-tab w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer text-left">
+            <i data-lucide="wallet" class="w-4 h-4 shrink-0"></i>
+            <span class="truncate">Cashflow 2 Arah</span>
+          </button>
+        </div>
+
+        <!-- GROUP: PENGATURAN SISTEM (ADMIN) -->
+        <div id="nav-group-pengaturan" class="space-y-1">
+          <div class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+            Pengaturan Sistem
+          </div>
+          <button onclick="handleNavClick('users')" id="tab-users"
+            class="nav-tab w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer text-left"
+            style="display: none;">
+            <i data-lucide="shield" class="w-4 h-4 shrink-0"></i>
+            <span class="truncate">Manajemen User</span>
+          </button>
+          <button onclick="handleNavClick('gallery-mgmt')" id="tab-gallery-mgmt"
+            class="nav-tab w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-xs font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/60 cursor-pointer text-left"
+            style="display: none;">
+            <i data-lucide="image" class="w-4 h-4 shrink-0"></i>
+            <span class="truncate">Kelola Galeri Index</span>
+          </button>
+        </div>
+
+      </nav>
+
+      <!-- SIDEBAR FOOTER: USER PROFILE & LOGOUT -->
+      <div class="p-3 border-t border-slate-800 bg-slate-900/95 shrink-0">
+        <div class="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 border border-slate-800">
+          <div class="flex items-center space-x-2.5 min-w-0">
+            <div
+              class="w-8 h-8 rounded-full bg-sky-900/60 text-sky-400 flex items-center justify-center shrink-0 border border-sky-800/50">
+              <i data-lucide="user" class="w-4 h-4"></i>
             </div>
-            <div class="flex items-center gap-2">
-              <select id="bon-status-select" onchange="updateBonStatus()" class="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 font-medium">
-                <option value="Draft">Draft</option>
-                <option value="Disetujui">Disetujui</option>
-                <option value="Selesai">Selesai</option>
-              </select>
-              <button id="btnSaveBon" onclick="saveCurrentBon()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-4 py-2 rounded-lg items-center gap-1.5 shadow" style="display: none;">
-                <i data-lucide="save" class="w-4 h-4"></i> Simpan Perubahan
+            <div class="min-w-0">
+              <span id="userNameDisplay" class="text-xs font-semibold text-white block truncate leading-tight"></span>
+              <span id="userRoleDisplay"
+                class="text-[10px] text-sky-400 uppercase tracking-wider block font-medium leading-tight"></span>
+            </div>
+          </div>
+          <button onclick="handleLogout()" title="Logout dari sistem"
+            class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition border border-transparent hover:border-rose-900/40 cursor-pointer"
+            aria-label="Logout">
+            <i data-lucide="log-out" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- RIGHT CONTENT AREA -->
+    <div class="flex-1 flex flex-col min-w-0 min-h-screen">
+
+      <!-- TOPBAR HEADER -->
+      <header class="bg-white dark:bg-slate-900 sticky top-0 z-30 shadow-xs border-b border-slate-200 dark:border-slate-800 transition-colors duration-200">
+        <div class="px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+
+          <!-- Left: Hamburger button (mobile) + Page Title & Subtitle -->
+          <div class="flex items-center space-x-3 min-w-0">
+            <button onclick="toggleSidebar(true)"
+              class="lg:hidden p-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer"
+              aria-label="Buka navigasi">
+              <i data-lucide="menu" class="w-5 h-5"></i>
+            </button>
+            <div class="min-w-0">
+              <h1 id="topbarPageTitle" class="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight truncate">
+                Executive Dashboard</h1>
+              <p id="topbarPageSubtitle" class="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 truncate hidden sm:block">
+                Ringkasan performa pendapatan dan progres operasional FTTH</p>
+            </div>
+          </div>
+
+          <!-- Right: Contextual Quick Actions & Theme Toggle -->
+          <div class="flex items-center space-x-2 sm:space-x-3 shrink-0">
+            <button type="button" id="btnThemeToggle" onclick="toggleTheme()" title="Ubah Tema Terang / Gelap"
+              class="p-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-700 transition cursor-pointer flex items-center justify-center shrink-0"
+              aria-label="Toggle Dark Mode">
+              <i data-lucide="sun" id="themeIconSun" class="w-4 h-4 hidden text-amber-400"></i>
+              <i data-lucide="moon" id="themeIconMoon" class="w-4 h-4 block text-slate-600 dark:text-slate-300"></i>
+            </button>
+            <button onclick="openModal('modalAddProject')" id="btnTambahWO"
+              class="flex items-center space-x-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition shadow-xs cursor-pointer">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i>
+              <span class="hidden sm:inline">Tambah WO Baru</span>
+              <span class="sm:hidden">WO Baru</span>
+            </button>
+            <button onclick="exportProjectsCSV()"
+              class="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 transition cursor-pointer">
+              <i data-lucide="download" class="w-4 h-4"></i>
+              <span class="hidden sm:inline">Ekspor CSV</span>
+            </button>
+          </div>
+
+        </div>
+      </header>
+
+      <!-- MAIN CONTAINER -->
+      <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+        <!-- ============================================================= -->
+        <!-- TAB: BON MATERIAL (PENGELOLAAN MATERIAL PER WO)               -->
+        <!-- ============================================================= -->
+        <div id="content-bon-material" class="tab-content hidden space-y-6">
+
+          <!-- Header + WO Selector -->
+          <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h2 class="font-bold text-base text-slate-900 flex items-center gap-2">
+                  <i data-lucide="package" class="w-5 h-5 text-sky-600"></i>
+                  <span>Bon Material per Work Order</span>
+                </h2>
+                <p class="text-xs text-slate-500">Setiap WO disertai bon material. Pantau material rencana, sudah
+                  datang, terpakai di lapangan, dan sisa.</p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <select id="bon-wo-select" onchange="onBonWOChange()"
+                  class="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 font-medium min-w-[220px]">
+                  <option value="">-- Pilih Work Order --</option>
+                </select>
+                <button id="btnCreateBon" onclick="createBonForSelectedWO()"
+                  class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg items-center gap-1.5 shadow"
+                  style="display: none;">
+                  <i data-lucide="plus" class="w-4 h-4"></i> Buat Bon Baru
+                </button>
+                <button id="btnInboundMaterial"
+                  onclick="openModal('modalMaterialInbound'); populateInboundMaterialOptions();"
+                  class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg items-center gap-1.5 shadow"
+                  style="display: none;">
+                  <i data-lucide="arrow-down-circle" class="w-4 h-4"></i> + Material Datang
+                </button>
+                <button id="btnHistoryInbound" onclick="openModal('modalHistoryInbound'); loadMaterialInbounds();"
+                  class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-3 py-2 rounded-lg items-center gap-1.5 border border-slate-300 cursor-pointer">
+                  <i data-lucide="history" class="w-4 h-4"></i> Riwayat Masuk
+                </button>
+                <button id="btnManageMaterials" onclick="openModal('modalManageMaterials'); renderMaterialsList();"
+                  class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold px-3 py-2 rounded-lg items-center gap-1.5 border border-slate-300"
+                  style="display: none;">
+                  <i data-lucide="settings" class="w-4 h-4"></i> Master Material
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Antrean Request Pending Telegram/Web -->
+          <div id="bon-pending-card" class="bg-white p-5 rounded-xl border border-amber-200/90 shadow-xs">
+            <div
+              class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-100 pb-3">
+              <div class="flex items-center gap-2.5">
+                <span class="p-1.5 rounded-lg bg-amber-100 text-amber-700 shrink-0">
+                  <i data-lucide="clock" class="w-4 h-4"></i>
+                </span>
+                <div>
+                  <h3 class="font-bold text-sm text-slate-900 flex items-center gap-2">
+                    <span>Antrean Request Material Masuk (Pending Approval PM)</span>
+                    <span id="bon-pending-badge"
+                      class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white">0</span>
+                  </h3>
+                  <p class="text-xs text-slate-500">Diajukan oleh Teknisi / Admin via Bot Telegram atau Web. Menunggu
+                    persetujuan PM untuk masuk ke Bon WO.</p>
+                </div>
+              </div>
+              <button onclick="loadBonRequests()"
+                class="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 cursor-pointer">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Refresh Antrean
+              </button>
+            </div>
+            <div id="bon-pending-list" class="mt-3 space-y-2">
+              <!-- Rendered by app.js -->
+            </div>
+          </div>
+
+          <!-- Bon Detail -->
+          <div id="bon-detail-container" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+              <div
+                class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-4">
+                <div>
+                  <h3 id="bon-detail-wo" class="font-bold text-slate-900 text-sm"></h3>
+                  <p id="bon-detail-meta" class="text-xs text-slate-500"></p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <select id="bon-status-select" onchange="updateBonStatus()"
+                    class="text-xs border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 font-medium">
+                    <option value="Draft">Draft</option>
+                    <option value="Disetujui">Disetujui</option>
+                    <option value="Selesai">Selesai</option>
+                  </select>
+                  <button id="btnSaveBon" onclick="saveCurrentBon()"
+                    class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-4 py-2 rounded-lg items-center gap-1.5 shadow"
+                    style="display: none;">
+                    <i data-lucide="save" class="w-4 h-4"></i> Simpan Perubahan
+                  </button>
+                </div>
+              </div>
+
+              <!-- Tambah item -->
+              <div id="bon-add-item-row" class="flex flex-col sm:flex-row gap-2 mt-4" style="display: none;">
+                <select id="bon-item-material"
+                  class="flex-1 text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white"></select>
+                <input type="number" id="bon-item-planned" min="0" placeholder="Qty rencana"
+                  class="w-32 text-xs border border-slate-300 rounded-lg px-3 py-2">
+                <button onclick="addBonItem()"
+                  class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-4 py-2 rounded-lg whitespace-nowrap">Tambah
+                  Item</button>
+              </div>
+
+              <!-- Tabel item -->
+              <div id="bon-items-container" class="overflow-x-auto mt-4">
+                <div class="text-center py-8 text-slate-400">
+                  <p class="text-xs">Belum ada material di bon ini.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty state -->
+          <div id="bon-empty-state" class="bg-white p-10 rounded-xl border border-slate-200 shadow-sm text-center">
+            <i data-lucide="package" class="w-10 h-10 text-slate-300 mx-auto mb-3"></i>
+            <p class="text-sm font-semibold text-slate-600">Pilih Work Order untuk melihat bon material</p>
+            <p class="text-xs text-slate-400 mt-1">Setiap WO baru otomatis dibuatkan bon material kosong.</p>
+          </div>
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- TAB 1: EXECUTIVE DASHBOARD (PANDANGAN DIREKSI / BOS)           -->
+        <!-- ============================================================= -->
+        <div id="content-dashboard" class="tab-content space-y-6">
+
+          <!-- Banner Sambutan -->
+          <div
+            class="bg-gradient-to-r from-slate-900 via-slate-800 to-sky-950 p-6 rounded-2xl shadow-lg border border-slate-700 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <span
+                class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 mb-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Real-time Financial & Operational Sync</span>
+              </span>
+              <h1 class="text-2xl font-bold tracking-tight">Executive Revenue & Operations Overview</h1>
+              <p class="text-sm text-slate-300 mt-1">Pantauan komprehensif kas masuk, sisa piutang, dan estimasi laba
+                bersih per SP/WO.</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="bg-slate-800/80 px-4 py-2 rounded-xl border border-slate-700 text-right">
+                <span class="text-xs text-slate-400 block">Klien Aktif</span>
+                <span class="font-bold text-sky-400 text-sm">Telkom • Icon+ • ID Net</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4 KPI CARDS -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- KPI 1: Order Book -->
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+              <div class="flex justify-between items-start">
+                <div>
+                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Pekerjaan Berjalan</p>
+                  <h3 id="kpi-orderbook" class="text-2xl font-bold text-slate-900 mt-1">Rp 0</h3>
+                  <p id="kpi-project-count" class="text-xs text-slate-500 mt-1">0 Proyek Aktif</p>
+                </div>
+                <div class="p-2.5 bg-sky-50 text-sky-600 rounded-lg">
+                  <i data-lucide="briefcase" class="w-5 h-5"></i>
+                </div>
+              </div>
+              <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                <span>Pagu Kontrak SP/WO</span>
+                <span class="font-semibold text-sky-600">Order Book</span>
+              </div>
+            </div>
+
+            <!-- KPI 2: Kas Masuk YTD -->
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+              <div class="flex justify-between items-start">
+                <div>
+                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Kas Diterima YTD</p>
+                  <h3 id="kpi-kasmasuk" class="text-2xl font-bold text-emerald-600 mt-1">Rp 0</h3>
+                  <p class="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                    <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
+                    <span>Invoice Lunas</span>
+                  </p>
+                </div>
+                <div class="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg">
+                  <i data-lucide="banknote" class="w-5 h-5"></i>
+                </div>
+              </div>
+              <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                <span>Realisasi Kas Masuk</span>
+                <span class="font-semibold text-emerald-600">Inflow Riil</span>
+              </div>
+            </div>
+
+            <!-- KPI 3: Sisa Piutang Klien -->
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+              <div class="flex justify-between items-start">
+                <div>
+                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Sisa Piutang</p>
+                  <h3 id="kpi-piutang" class="text-2xl font-bold text-amber-600 mt-1">Rp 0</h3>
+                  <p class="text-xs text-amber-600 mt-1">Dalam Proses BAST / Aging</p>
+                </div>
+                <div class="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
+                  <i data-lucide="clock" class="w-5 h-5"></i>
+                </div>
+              </div>
+              <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                <span>Piutang Klien Berjalan</span>
+                <span class="font-semibold text-amber-600">Pending Pencairan</span>
+              </div>
+            </div>
+
+            <!-- KPI 4: Estimasi Margin Bersih -->
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+              <div class="flex justify-between items-start">
+                <div>
+                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Estimasi Laba Bersih</p>
+                  <h3 id="kpi-margin" class="text-2xl font-bold text-indigo-600 mt-1">Rp 0</h3>
+                  <p id="kpi-margin-pct" class="text-xs text-indigo-600 mt-1 font-semibold">Margin: 0%</p>
+                </div>
+                <div class="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg">
+                  <i data-lucide="trending-up" class="w-5 h-5"></i>
+                </div>
+              </div>
+              <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                <span>Kontrak - Upah Mandor</span>
+                <span class="font-semibold text-indigo-600">Net Margin</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- GRAFIK SECTION -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Monthly Revenue Chart (2/3 width) -->
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm lg:col-span-2">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h2 class="font-bold text-base text-slate-900">Tren Revenue & Kas Masuk Bulanan</h2>
+                  <p class="text-xs text-slate-500">Perbandingan antara invoice yang ditagihkan vs kas riil masuk
+                    rekening</p>
+                </div>
+                <span class="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded font-medium">Tren 6 Bulan</span>
+              </div>
+              <div class="h-64">
+                <canvas id="revenueChart"></canvas>
+              </div>
+            </div>
+
+            <!-- Portofolio Klien Chart (1/3 width) -->
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 class="font-bold text-base text-slate-900">Distribusi Portofolio Klien</h2>
+                    <p class="text-xs text-slate-500">Komposisi nilai kontrak per klien</p>
+                  </div>
+                </div>
+                <div class="h-48 relative flex items-center justify-center">
+                  <canvas id="clientChart"></canvas>
+                </div>
+              </div>
+              <div id="client-breakdown-legend"
+                class="mt-4 pt-3 border-t border-slate-100 text-xs space-y-1.5 text-slate-600">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+          </div>
+
+          <!-- RADAR PIUTANG AGING & REKAP STATUS LAPANGAN -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Radar Aging Piutang Klien -->
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+              <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-2">
+                  <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-500"></i>
+                  <h2 class="font-bold text-base text-slate-900">Radar Piutang Tertahan (Aging AR)</h2>
+                </div>
+                <button onclick="switchTab('finance')"
+                  class="text-xs text-sky-600 hover:text-sky-700 font-semibold">Kelola Tagihan &rarr;</button>
+              </div>
+              <div id="aging-table-container" class="overflow-x-auto">
+                <!-- Table dynamically populated -->
+              </div>
+            </div>
+
+            <!-- Ringkasan Eksekutor (Internal vs Mandor) -->
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+              <div>
+                <div class="flex items-center justify-between mb-4">
+                  <div class="flex items-center space-x-2">
+                    <i data-lucide="pie-chart" class="w-5 h-5 text-indigo-600"></i>
+                    <h2 class="font-bold text-base text-slate-900">Alokasi Eksekutor: Internal vs Mandor</h2>
+                  </div>
+                </div>
+                <div id="executor-summary-content" class="space-y-4">
+                  <!-- Dynamically populated -->
+                </div>
+              </div>
+              <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                <span>Sistem Otomatis Pengunci Upah Mandor</span>
+                <span class="text-emerald-600 font-semibold flex items-center gap-1">
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- STOK MATERIAL GUDANG (DIAGRAM) -->
+          <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+              <div>
+                <h2 class="font-bold text-base text-slate-900 flex items-center gap-2">
+                  <i data-lucide="warehouse" class="w-5 h-5 text-sky-600"></i>
+                  <span>Stok Material di Gudang</span>
+                </h2>
+                <p class="text-xs text-slate-500">Jumlah material tersedia di gudang. Update stok via tab Bon Material
+                  &rarr; Kelola Material.</p>
+              </div>
+              <button onclick="switchTab('bon-material')"
+                class="text-xs text-sky-600 hover:text-sky-700 font-semibold whitespace-nowrap">Kelola Bon Material
+                &rarr;</button>
+            </div>
+
+            <!-- Summary chips -->
+            <div id="material-stock-summary" class="flex flex-wrap gap-2 mb-4">
+              <!-- Dynamically populated -->
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div class="h-64">
+                <canvas id="materialStockChart"></canvas>
+              </div>
+              <div id="material-stock-list" class="space-y-2 max-h-64 overflow-y-auto">
+                <!-- Dynamically populated, stok paling sedikit di atas -->
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ============================================================= -->
+        <!-- TAB 2: MANAJEMEN WO & LAPANGAN (PM WORKSPACE)                 -->
+        <!-- ============================================================= -->
+        <div id="content-projects" class="tab-content hidden space-y-6">
+
+          <!-- Filter Bar -->
+          <div
+            class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+            <div class="flex flex-wrap items-center gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Filter Klien</label>
+                <select id="filter-client" onchange="loadProjects()"
+                  class="text-xs border border-slate-300 rounded-lg px-3 py-1.5 bg-slate-50 font-medium">
+                  <option value="All">Semua Klien (Telkom, Icon+, ID Net)</option>
+                  <option value="Telkom Akses">Telkom Akses</option>
+                  <option value="Icon Net (PLN)">Icon Net (PLN)</option>
+                  <option value="ID Net">ID Net</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Tipe Eksekutor</label>
+                <select id="filter-executor" onchange="loadProjects()"
+                  class="text-xs border border-slate-300 rounded-lg px-3 py-1.5 bg-slate-50 font-medium">
+                  <option value="All">Semua Eksekutor</option>
+                  <option value="Internal">Tim Internal Vendor</option>
+                  <option value="Mandor">Mandor / Subkon</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Status Proyek</label>
+                <select id="filter-status" onchange="loadProjects()"
+                  class="text-xs border border-slate-300 rounded-lg px-3 py-1.5 bg-slate-50 font-medium">
+                  <option value="All">Semua Status</option>
+                  <option value="In-Progress">Sedang Berjalan</option>
+                  <option value="Blocked">Terkendala (Blocked)</option>
+                  <option value="Done">Selesai</option>
+                  <option value="To-Do">Belum Dimulai</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <button onclick="openModal('modalAddProject')"
+                class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 shadow">
+                <i data-lucide="plus" class="w-4 h-4"></i> Tambah Work Order Baru
               </button>
             </div>
           </div>
 
-          <!-- Tambah item -->
-          <div id="bon-add-item-row" class="flex flex-col sm:flex-row gap-2 mt-4" style="display: none;">
-            <select id="bon-item-material" class="flex-1 text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white"></select>
-            <input type="number" id="bon-item-planned" min="0" placeholder="Qty rencana" class="w-32 text-xs border border-slate-300 rounded-lg px-3 py-2">
-            <button onclick="addBonItem()" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-4 py-2 rounded-lg whitespace-nowrap">Tambah Item</button>
+          <!-- Projects Container -->
+          <div id="projects-container" class="space-y-6">
+            <!-- Dynamically populated project cards with 4 milestone cards -->
           </div>
 
-          <!-- Tabel item -->
-          <div id="bon-items-container" class="overflow-x-auto mt-4">
-            <div class="text-center py-8 text-slate-400">
-              <p class="text-xs">Belum ada material di bon ini.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Empty state -->
-      <div id="bon-empty-state" class="bg-white p-10 rounded-xl border border-slate-200 shadow-sm text-center">
-        <i data-lucide="package" class="w-10 h-10 text-slate-300 mx-auto mb-3"></i>
-        <p class="text-sm font-semibold text-slate-600">Pilih Work Order untuk melihat bon material</p>
-        <p class="text-xs text-slate-400 mt-1">Setiap WO baru otomatis dibuatkan bon material kosong.</p>
-      </div>
-    </div>
-
-    <!-- ============================================================= -->
-    <!-- TAB 1: EXECUTIVE DASHBOARD (PANDANGAN DIREKSI / BOS)           -->
-    <!-- ============================================================= -->
-    <div id="content-dashboard" class="tab-content space-y-6">
-      
-      <!-- Banner Sambutan -->
-      <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-sky-950 p-6 rounded-2xl shadow-lg border border-slate-700 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <span class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 mb-2">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>Real-time Financial & Operational Sync</span>
-          </span>
-          <h1 class="text-2xl font-bold tracking-tight">Executive Revenue & Operations Overview</h1>
-          <p class="text-sm text-slate-300 mt-1">Pantauan komprehensif kas masuk, sisa piutang, dan estimasi laba kotor per SP/WO.</p>
-        </div>
-        <div class="flex items-center gap-3">
-          <div class="bg-slate-800/80 px-4 py-2 rounded-xl border border-slate-700 text-right">
-            <span class="text-xs text-slate-400 block">Klien Aktif</span>
-            <span class="font-bold text-sky-400 text-sm">Telkom • Icon+ • ID Net</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 4 KPI CARDS -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <!-- KPI 1: Order Book -->
-        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
-          <div class="flex justify-between items-start">
-            <div>
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Pekerjaan Berjalan</p>
-              <h3 id="kpi-orderbook" class="text-2xl font-bold text-slate-900 mt-1">Rp 0</h3>
-              <p id="kpi-project-count" class="text-xs text-slate-500 mt-1">0 Proyek Aktif</p>
-            </div>
-            <div class="p-2.5 bg-sky-50 text-sky-600 rounded-lg">
-              <i data-lucide="briefcase" class="w-5 h-5"></i>
-            </div>
-          </div>
-          <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>Pagu Kontrak SP/WO</span>
-            <span class="font-semibold text-sky-600">Order Book</span>
-          </div>
         </div>
 
-        <!-- KPI 2: Kas Masuk YTD -->
-        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
-          <div class="flex justify-between items-start">
-            <div>
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Kas Diterima YTD</p>
-              <h3 id="kpi-kasmasuk" class="text-2xl font-bold text-emerald-600 mt-1">Rp 0</h3>
-              <p class="text-xs text-emerald-600 mt-1 flex items-center gap-1">
-                <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
-                <span>Invoice Lunas</span>
-              </p>
-            </div>
-            <div class="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg">
-              <i data-lucide="banknote" class="w-5 h-5"></i>
-            </div>
-          </div>
-          <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>Realisasi Kas Masuk</span>
-            <span class="font-semibold text-emerald-600">Inflow Riil</span>
-          </div>
-        </div>
+        <!-- ============================================================= -->
+        <!-- TAB 4: KEUANGAN & CASHFLOW 2 ARAH                             -->
+        <!-- ============================================================= -->
+        <div id="content-finance" class="tab-content hidden space-y-6">
 
-        <!-- KPI 3: Sisa Piutang Klien -->
-        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
-          <div class="flex justify-between items-start">
-            <div>
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Sisa Piutang</p>
-              <h3 id="kpi-piutang" class="text-2xl font-bold text-amber-600 mt-1">Rp 0</h3>
-              <p class="text-xs text-amber-600 mt-1">Dalam Proses BAST / Aging</p>
-            </div>
-            <div class="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
-              <i data-lucide="clock" class="w-5 h-5"></i>
-            </div>
+          <!-- Navigation Inflow vs Outflow -->
+          <div class="flex border-b border-slate-200 gap-4">
+            <button onclick="switchFinanceSubTab('inflow')" id="btn-sub-inflow"
+              class="pb-3 text-sm font-bold border-b-2 border-sky-600 text-sky-600 flex items-center gap-2">
+              <i data-lucide="arrow-down-left" class="w-4 h-4"></i>
+              <span>Jalur Kas Masuk (Tagihan SP/Invoice Klien)</span>
+            </button>
+            <button onclick="switchFinanceSubTab('outflow')" id="btn-sub-outflow"
+              class="pb-3 text-sm font-medium text-slate-500 hover:text-slate-800 flex items-center gap-2">
+              <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+              <span>Jalur Kas Keluar (Upah Borongan Mandor)</span>
+            </button>
           </div>
-          <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>Piutang Klien Berjalan</span>
-            <span class="font-semibold text-amber-600">Pending Pencairan</span>
-          </div>
-        </div>
 
-        <!-- KPI 4: Estimasi Margin Kotor -->
-        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
-          <div class="flex justify-between items-start">
-            <div>
-              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Estimasi Laba Kotor</p>
-              <h3 id="kpi-margin" class="text-2xl font-bold text-indigo-600 mt-1">Rp 0</h3>
-              <p id="kpi-margin-pct" class="text-xs text-indigo-600 mt-1 font-semibold">Margin: 0%</p>
-            </div>
-            <div class="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg">
-              <i data-lucide="trending-up" class="w-5 h-5"></i>
-            </div>
-          </div>
-          <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>Kontrak - Upah Mandor</span>
-            <span class="font-semibold text-indigo-600">Gross Margin</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- GRAFIK SECTION -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Monthly Revenue Chart (2/3 width) -->
-        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm lg:col-span-2">
-          <div class="flex items-center justify-between mb-4">
-            <div>
-              <h2 class="font-bold text-base text-slate-900">Tren Revenue & Kas Masuk Bulanan</h2>
-              <p class="text-xs text-slate-500">Perbandingan antara invoice yang ditagihkan vs kas riil masuk rekening</p>
-            </div>
-            <span class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded font-medium">Tahun 2026</span>
-          </div>
-          <div class="h-64">
-            <canvas id="revenueChart"></canvas>
-          </div>
-        </div>
-
-        <!-- Portofolio Klien Chart (1/3 width) -->
-        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div>
-            <div class="flex items-center justify-between mb-4">
+          <!-- SUB-TAB 1: KAS MASUK (INFLOW) -->
+          <div id="sub-content-inflow" class="space-y-4">
+            <div class="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200">
               <div>
-                <h2 class="font-bold text-base text-slate-900">Distribusi Portofolio Klien</h2>
-                <p class="text-xs text-slate-500">Komposisi nilai kontrak per klien</p>
+                <h3 class="font-bold text-slate-900 text-sm">Daftar Tagihan & Status Pembayaran Klien</h3>
+                <p class="text-xs text-slate-500">Monitoring pengajuan BAST, nomor SP Telkom Akses, tanggal faktur, dan
+                  konfirmasi pelunasan.</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button onclick="exportInvoicesCSV()"
+                  class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 border border-slate-700 transition">
+                  <i data-lucide="download" class="w-4 h-4"></i> Ekspor CSV
+                </button>
+                <a href="/Invoice-Form-Pdf-Generator.html" target="_blank" id="btnInvoicePdfGenerator"
+                  class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow transition">
+                  <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Generator PDF (Excel)
+                </a>
+                <button id="btnTambahInvoice" onclick="openModal('modalAddInvoice')"
+                  class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow">
+                  <i data-lucide="plus" class="w-4 h-4"></i> Buat Tagihan
+                </button>
               </div>
             </div>
-            <div class="h-48 relative flex items-center justify-center">
-              <canvas id="clientChart"></canvas>
+
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold">
+                  <tr>
+                    <th class="p-3">ID Invoice</th>
+                    <th class="p-3">Klien</th>
+                    <th class="p-3">Nama SP</th>
+                    <th class="p-3">Total LOP</th>
+                    <th class="p-3 text-right">Nominal Total (Rp)</th>
+                    <th class="p-3">Status</th>
+                    <th class="p-3">Tgl Invoice</th>
+                    <th class="p-3">Jatuh Tempo</th>
+                    <th class="p-3">Aging Group</th>
+                    <th class="p-3 text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="invoices-table-body" class="divide-y divide-slate-100">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
             </div>
           </div>
-          <div id="client-breakdown-legend" class="mt-4 pt-3 border-t border-slate-100 text-xs space-y-1.5 text-slate-600">
-            <!-- Dynamically populated -->
-          </div>
-        </div>
-      </div>
 
-      <!-- RADAR PIUTANG AGING & REKAP STATUS LAPANGAN -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Radar Aging Piutang Klien -->
-        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center space-x-2">
-              <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-500"></i>
-              <h2 class="font-bold text-base text-slate-900">Radar Piutang Tertahan (Aging AR)</h2>
+          <!-- SUB-TAB 2: KAS KELUAR (OUTFLOW - MANDOR PAYOUT) -->
+          <div id="sub-content-outflow" class="hidden space-y-4">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-xl border border-slate-200">
+              <div>
+                <h3 class="font-bold text-slate-900 text-sm">Daftar Pengeluaran Upah Mandor & Kas Keluar</h3>
+                <p class="text-xs text-slate-500">Pencatatan kas keluar mandor, verifikasi fisik PM, dan otorisasi pencairan finance.</p>
+              </div>
+              <button type="button" onclick="openModal('modalAddMandorPayout')"
+                class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow-xs transition cursor-pointer">
+                <i data-lucide="plus" class="w-4 h-4"></i> Catat Kas Keluar
+              </button>
             </div>
-            <button onclick="switchTab('finance')" class="text-xs text-sky-600 hover:text-sky-700 font-semibold">Kelola Tagihan &rarr;</button>
-          </div>
-          <div id="aging-table-container" class="overflow-x-auto">
-            <!-- Table dynamically populated -->
-          </div>
-        </div>
 
-        <!-- Ringkasan Eksekutor (Internal vs Mandor) -->
-        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div>
-            <div class="flex items-center justify-between mb-4">
-              <div class="flex items-center space-x-2">
-                <i data-lucide="pie-chart" class="w-5 h-5 text-indigo-600"></i>
-                <h2 class="font-bold text-base text-slate-900">Alokasi Eksekutor: Internal vs Mandor</h2>
+            <div class="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3">
+              <i data-lucide="shield-alert" class="w-5 h-5 text-amber-600 mt-0.5"></i>
+              <div>
+                <h4 class="font-bold text-amber-800 text-sm">SOP Penguncian Kas Keluar</h4>
+                <p class="text-xs text-amber-700 mt-0.5">Upah mandor <b>HANYA DAPAT DICATAT LUNAS</b> apabila Project
+                  Manager (PM) telah memverifikasi bahwa titik fisik pekerjaan di lapangan (Tiang / KU / ODP) berstatus
+                  <span class="bg-emerald-100 text-emerald-800 px-1 py-0.5 rounded font-bold">Done</span>.
+                </p>
               </div>
             </div>
-            <div id="executor-summary-content" class="space-y-4">
-              <!-- Dynamically populated -->
+
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold">
+                  <tr>
+                    <th class="p-3">ID Klaim</th>
+                    <th class="p-3">Nama Mandor</th>
+                    <th class="p-3">Nomor WO</th>
+                    <th class="p-3">Tahap Lapangan</th>
+                    <th class="p-3 text-right">Nominal Upah (Rp)</th>
+                    <th class="p-3">Verifikasi PM</th>
+                    <th class="p-3">Status Pembayaran</th>
+                    <th class="p-3">Catatan PM</th>
+                    <th class="p-3 text-center">Aksi Otorisasi</th>
+                  </tr>
+                </thead>
+                <tbody id="mandor-payouts-table-body" class="divide-y divide-slate-100">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
             </div>
           </div>
-          <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>Sistem Otomatis Pengunci Upah Mandor</span>
-            <span class="text-emerald-600 font-semibold flex items-center gap-1">
-              <i data-lucide="shield-check" class="w-4 h-4"></i> Anti-Boncos
-            </span>
-          </div>
-        </div>
-      </div>
 
-      <!-- STOK MATERIAL GUDANG (DIAGRAM) -->
-      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-          <div>
-            <h2 class="font-bold text-base text-slate-900 flex items-center gap-2">
-              <i data-lucide="warehouse" class="w-5 h-5 text-sky-600"></i>
-              <span>Stok Material di Gudang</span>
-            </h2>
-            <p class="text-xs text-slate-500">Jumlah material tersedia di gudang. Update stok via tab Bon Material &rarr; Kelola Material.</p>
-          </div>
-          <button onclick="switchTab('bon-material')" class="text-xs text-sky-600 hover:text-sky-700 font-semibold whitespace-nowrap">Kelola Bon Material &rarr;</button>
         </div>
 
-        <!-- Summary chips -->
-        <div id="material-stock-summary" class="flex flex-wrap gap-2 mb-4">
-          <!-- Dynamically populated -->
+        <!-- ============================================================= -->
+        <!-- TAB 5: MASTER EKSEKUTOR                                       -->
+        <!-- ============================================================= -->
+        <div id="content-executors" class="tab-content hidden space-y-6">
+
+          <!-- KPI Summary Cards -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center gap-3.5">
+              <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 shrink-0">
+                <i data-lucide="users" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Eksekutor</p>
+                <p id="kpi-exec-total" class="text-xl font-bold text-slate-900 mt-0.5">0</p>
+                <p class="text-[10px] text-slate-400">Tim & Mitra Terdaftar</p>
+              </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl border border-sky-200 shadow-xs flex items-center gap-3.5">
+              <div class="w-10 h-10 rounded-xl bg-sky-100 flex items-center justify-center text-sky-700 shrink-0">
+                <i data-lucide="shield" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <p class="text-[11px] font-semibold text-sky-700 uppercase tracking-wider">Tim Internal</p>
+                <p id="kpi-exec-internal" class="text-xl font-bold text-slate-900 mt-0.5">0</p>
+                <p class="text-[10px] text-slate-400">Armada PT AKU</p>
+              </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl border border-amber-200 shadow-xs flex items-center gap-3.5">
+              <div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700 shrink-0">
+                <i data-lucide="hard-hat" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <p class="text-[11px] font-semibold text-amber-700 uppercase tracking-wider">Mandor / Subkon</p>
+                <p id="kpi-exec-mandor" class="text-xl font-bold text-slate-900 mt-0.5">0</p>
+                <p class="text-[10px] text-slate-400">Mitra Borongan</p>
+              </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl border border-emerald-200 shadow-xs flex items-center gap-3.5">
+              <div
+                class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0">
+                <i data-lucide="activity" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <p class="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">WO Aktif Berjalan</p>
+                <p id="kpi-exec-active-wos" class="text-xl font-bold text-slate-900 mt-0.5">0</p>
+                <p class="text-[10px] text-slate-400">Pekerjaan Lapangan</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action & Filter Bar -->
+          <div
+            class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" onclick="setExecutorFilter('All')" id="btn-filter-exec-all"
+                class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer bg-slate-900 text-white shadow-xs">
+                Semua (<span id="count-exec-all">0</span>)
+              </button>
+              <button type="button" onclick="setExecutorFilter('Internal')" id="btn-filter-exec-internal"
+                class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer text-slate-600 hover:bg-slate-100">
+                Tim Internal (<span id="count-exec-internal">0</span>)
+              </button>
+              <button type="button" onclick="setExecutorFilter('Mandor')" id="btn-filter-exec-mandor"
+                class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer text-slate-600 hover:bg-slate-100">
+                Mandor / Subkon (<span id="count-exec-mandor">0</span>)
+              </button>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <div class="relative flex-1 md:w-64">
+                <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-400 pointer-events-none"></i>
+                <input type="text" id="search-executor" oninput="handleExecutorSearch(this.value)"
+                  placeholder="Cari nama, PIC, wilayah, keahlian..."
+                  class="w-full text-xs pl-9 pr-3 py-1.5 rounded-lg border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-sky-500 bg-slate-50 focus:bg-white transition">
+              </div>
+              <button id="btnAddExecutor" onclick="openModalAddExecutor()"
+                class="hidden bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-4 py-2 rounded-lg items-center gap-1.5 shadow-xs transition cursor-pointer shrink-0">
+                <i data-lucide="user-plus" class="w-4 h-4"></i> + Tambah Eksekutor
+              </button>
+            </div>
+          </div>
+
+          <!-- Main Container Grid -->
+          <div id="executors-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            <!-- Dynamically populated from public/app.js -->
+          </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div class="h-64">
-            <canvas id="materialStockChart"></canvas>
-          </div>
-          <div id="material-stock-list" class="space-y-2 max-h-64 overflow-y-auto">
-            <!-- Dynamically populated, stok paling sedikit di atas -->
+        <!-- ============================================================= -->
+        <!-- TAB 6: MANAJEMEN USER (SUPER ADMIN)                           -->
+        <!-- ============================================================= -->
+        <div id="content-users" class="tab-content hidden space-y-6">
+          <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <div class="flex justify-between items-center mb-6">
+              <div>
+                <h2 class="font-bold text-base text-slate-900 flex items-center gap-2">
+                  <i data-lucide="shield" class="w-5 h-5 text-sky-600"></i>
+                  <span>Manajemen Akses User</span>
+                </h2>
+                <p class="text-xs text-slate-500">Buat user baru, atur role, atau reset password.</p>
+              </div>
+              <button onclick="openModal('modalAddUser')"
+                class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 shadow">
+                <i data-lucide="user-plus" class="w-4 h-4"></i> Tambah User Baru
+              </button>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold">
+                  <tr>
+                    <th class="p-3">Nama Lengkap</th>
+                    <th class="p-3">Username</th>
+                    <th class="p-3">Role</th>
+                    <th class="p-3 text-center">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="users-table-body" class="divide-y divide-slate-100">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- TABEL USER BOT TELEGRAM -->
+            <div class="mt-8 pt-6 border-t border-slate-200">
+              <div class="flex justify-between items-center mb-4">
+                <div class="flex items-center gap-2">
+                  <div class="p-1.5 rounded-lg bg-sky-100 text-sky-600">
+                    <i data-lucide="send" class="w-4 h-4"></i>
+                  </div>
+                  <div>
+                    <h3 class="font-bold text-sm text-slate-900">Akun Pengguna Bot Telegram</h3>
+                    <p class="text-xs text-slate-500">Kelola pengguna bot (Teknisi, Admin, PM, Superadmin) yang berhak
+                      request & approve via Telegram.</p>
+                  </div>
+                </div>
+                <button onclick="openModal('modalAddTelegramUser')"
+                  class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow">
+                  <i data-lucide="user-plus" class="w-4 h-4"></i> + Tambah User Bot
+                </button>
+              </div>
+
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                  <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold">
+                    <tr>
+                      <th class="p-3">ID Telegram</th>
+                      <th class="p-3">Nama Lengkap</th>
+                      <th class="p-3">Username</th>
+                      <th class="p-3">Role Bot</th>
+                      <th class="p-3">Tanggal Didaftarkan</th>
+                      <th class="p-3 text-center">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tg-users-table-body" class="divide-y divide-slate-100">
+                    <!-- Dynamically populated -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-    </div>
-
-    <!-- ============================================================= -->
-    <!-- TAB 2: MANAJEMEN WO & LAPANGAN (PM WORKSPACE)                 -->
-    <!-- ============================================================= -->
-    <div id="content-projects" class="tab-content hidden space-y-6">
-      
-      <!-- Filter Bar -->
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
-        <div class="flex flex-wrap items-center gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Filter Klien</label>
-            <select id="filter-client" onchange="loadProjects()" class="text-xs border border-slate-300 rounded-lg px-3 py-1.5 bg-slate-50 font-medium">
-              <option value="All">Semua Klien (Telkom, Icon+, ID Net)</option>
-              <option value="Telkom Akses">Telkom Akses</option>
-              <option value="Icon Net (PLN)">Icon Net (PLN)</option>
-              <option value="ID Net">ID Net</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Tipe Eksekutor</label>
-            <select id="filter-executor" onchange="loadProjects()" class="text-xs border border-slate-300 rounded-lg px-3 py-1.5 bg-slate-50 font-medium">
-              <option value="All">Semua Eksekutor</option>
-              <option value="Internal">Tim Internal Vendor</option>
-              <option value="Mandor">Mandor / Subkon</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-slate-500 uppercase mb-1">Status Proyek</label>
-            <select id="filter-status" onchange="loadProjects()" class="text-xs border border-slate-300 rounded-lg px-3 py-1.5 bg-slate-50 font-medium">
-              <option value="All">Semua Status</option>
-              <option value="In-Progress">Sedang Berjalan</option>
-              <option value="Blocked">Terkendala (Blocked)</option>
-              <option value="Done">Selesai</option>
-              <option value="To-Do">Belum Dimulai</option>
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <button onclick="openModal('modalAddProject')" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 shadow">
-            <i data-lucide="plus" class="w-4 h-4"></i> Tambah Work Order Baru
-          </button>
-        </div>
-      </div>
-
-      <!-- Projects Container -->
-      <div id="projects-container" class="space-y-6">
-        <!-- Dynamically populated project cards with 4 milestone cards -->
-      </div>
-
-    </div>
-
-    <!-- ============================================================= -->
-    <!-- TAB 4: KEUANGAN & CASHFLOW 2 ARAH                             -->
-    <!-- ============================================================= -->
-    <div id="content-finance" class="tab-content hidden space-y-6">
-
-      <!-- Navigation Inflow vs Outflow -->
-      <div class="flex border-b border-slate-200 gap-4">
-        <button onclick="switchFinanceSubTab('inflow')" id="btn-sub-inflow" class="pb-3 text-sm font-bold border-b-2 border-sky-600 text-sky-600 flex items-center gap-2">
-          <i data-lucide="arrow-down-left" class="w-4 h-4"></i>
-          <span>Jalur Kas Masuk (Tagihan SP/Invoice Klien)</span>
-        </button>
-        <button onclick="switchFinanceSubTab('outflow')" id="btn-sub-outflow" class="pb-3 text-sm font-medium text-slate-500 hover:text-slate-800 flex items-center gap-2">
-          <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
-          <span>Jalur Kas Keluar (Upah Borongan Mandor)</span>
-        </button>
-      </div>
-
-      <!-- SUB-TAB 1: KAS MASUK (INFLOW) -->
-      <div id="sub-content-inflow" class="space-y-4">
-        <div class="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200">
-          <div>
-            <h3 class="font-bold text-slate-900 text-sm">Daftar Tagihan & Status Pembayaran Klien</h3>
-            <p class="text-xs text-slate-500">Monitoring pengajuan BAST, nomor SP Telkom Akses, tanggal faktur, dan konfirmasi pelunasan.</p>
-          </div>
-          <div class="flex items-center gap-2">
-            <button onclick="exportInvoicesCSV()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 border border-slate-700 transition">
-              <i data-lucide="download" class="w-4 h-4"></i> Ekspor CSV
+        <!-- ============================================================= -->
+        <!-- TAB 7: GALLERY MANAGEMENT (SUPER ADMIN)                       -->
+        <!-- ============================================================= -->
+        <div id="content-gallery-mgmt" class="tab-content hidden space-y-6">
+          <div
+            class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+            <div>
+              <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <i data-lucide="image" class="w-5 h-5 text-sky-600"></i> Manajemen Galeri Landing Page (Index)
+              </h2>
+              <p class="text-xs text-slate-500 mt-1">Super Admin dapat menambah, mengunggah, mengedit, atau menghapus
+                foto dokumentasi yang tampil di halaman beranda (index.html).</p>
+            </div>
+            <button onclick="openModal('modalAddGallery')"
+              class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow transition flex items-center gap-2">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i> Upload Foto Baru
             </button>
-            <a href="/Invoice-Form-Pdf-Generator.html" target="_blank" id="btnInvoicePdfGenerator" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow transition">
-              <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Generator PDF (Excel)
-            </a>
-            <button id="btnTambahInvoice" onclick="openModal('modalAddInvoice')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow">
-              <i data-lucide="plus" class="w-4 h-4"></i> Buat Tagihan Termin
-            </button>
+          </div>
+
+          <!-- Gallery Grid in Dashboard -->
+          <div id="gallery-mgmt-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <!-- Rendered by app.js -->
           </div>
         </div>
 
-        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
-          <table class="w-full text-left text-xs">
-            <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold">
-              <tr>
-                <th class="p-3">ID Invoice / SP</th>
-                <th class="p-3">Klien</th>
-                <th class="p-3">Nomor WO</th>
-                <th class="p-3">Termin</th>
-                <th class="p-3 text-right">Nominal (Rp)</th>
-                <th class="p-3">Status</th>
-                <th class="p-3">Tgl Invoice</th>
-                <th class="p-3">Jatuh Tempo</th>
-                <th class="p-3">Aging Group</th>
-                <th class="p-3 text-center">Aksi</th>
-              </tr>
-            </thead>
-            <tbody id="invoices-table-body" class="divide-y divide-slate-100">
-              <!-- Dynamically populated -->
-            </tbody>
-          </table>
-        </div>
-      </div>
+      </main>
 
-      <!-- SUB-TAB 2: KAS KELUAR (OUTFLOW - MANDOR PAYOUT) -->
-      <div id="sub-content-outflow" class="hidden space-y-4">
-        <div class="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3">
-          <i data-lucide="shield-alert" class="w-5 h-5 text-amber-600 mt-0.5"></i>
-          <div>
-            <h4 class="font-bold text-amber-800 text-sm">SOP Penguncian Kas Keluar (Anti-Boncos)</h4>
-            <p class="text-xs text-amber-700 mt-0.5">Upah mandor <b>HANYA DAPAT DICATAT LUNAS</b> apabila Project Manager (PM) telah memverifikasi bahwa titik fisik pekerjaan di lapangan (Tiang / KU / ODP) berstatus <span class="bg-emerald-100 text-emerald-800 px-1 py-0.5 rounded font-bold">Done</span>.</p>
-          </div>
-        </div>
+      <!-- FOOTER -->
+      <footer
+        class="bg-white border-t border-slate-200 text-slate-500 text-xs py-4 px-4 sm:px-6 lg:px-8 text-center mt-auto space-y-1">
+        <p class="font-medium text-slate-700">PT Akses Kwalitas Unggul &copy; 2026 • Sistem Monitoring Pekerjaan &
+          Keuangan Vendor FTTH</p>
+        <p class="text-[11px] text-slate-500">
+          Kantor: Jl. Dukuh Setro 7-19A Surabaya | Telp: <a href="tel:03151500050"
+            class="hover:text-slate-800 underline">031-51500050</a> | WA: <a href="https://wa.me/6285850447888"
+            target="_blank" rel="noopener"
+            class="text-emerald-600 hover:text-emerald-700 font-semibold underline">0858-5044-7888</a> | Email: <a
+            href="mailto:admin@akseskwalitasunggul.com"
+            class="hover:text-slate-800 underline">admin@akseskwalitasunggul.com</a>
+        </p>
+      </footer>
 
-        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
-          <table class="w-full text-left text-xs">
-            <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold">
-              <tr>
-                <th class="p-3">ID Klaim</th>
-                <th class="p-3">Nama Mandor</th>
-                <th class="p-3">Nomor WO</th>
-                <th class="p-3">Tahap Lapangan</th>
-                <th class="p-3 text-right">Nominal Upah (Rp)</th>
-                <th class="p-3">Verifikasi PM</th>
-                <th class="p-3">Status Pembayaran</th>
-                <th class="p-3">Catatan PM</th>
-                <th class="p-3 text-center">Aksi Otorisasi</th>
-              </tr>
-            </thead>
-            <tbody id="mandor-payouts-table-body" class="divide-y divide-slate-100">
-              <!-- Dynamically populated -->
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- ============================================================= -->
-    <!-- TAB 5: MASTER EKSEKUTOR                                       -->
-    <!-- ============================================================= -->
-    <div id="content-executors" class="tab-content hidden space-y-6">
-      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <div class="flex justify-between items-center mb-6">
-          <div>
-            <h2 class="font-bold text-base text-slate-900 flex items-center gap-2">
-              <i data-lucide="users" class="w-5 h-5 text-sky-600"></i>
-              <span>Direktori Tim Internal & Mitra Mandor Borongan</span>
-            </h2>
-            <p class="text-xs text-slate-500">Daftar eksekutor lapangan, kontak koordinator/mandor, standar tarif upah, dan performa.</p>
-          </div>
-          <button id="btnAddExecutor" onclick="openModal('modalEditExecutor'); resetExecutorForm();" class="hidden bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-4 py-2 rounded-lg items-center gap-1.5 shadow">
-            <i data-lucide="user-plus" class="w-4 h-4"></i> Tambah Eksekutor
-          </button>
-        </div>
-
-        <div id="executors-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <!-- Dynamically populated -->
-        </div>
-      </div>
-    </div>
-
-    <!-- ============================================================= -->
-    <!-- TAB 6: MANAJEMEN USER (SUPER ADMIN)                           -->
-    <!-- ============================================================= -->
-    <div id="content-users" class="tab-content hidden space-y-6">
-      <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <div class="flex justify-between items-center mb-6">
-          <div>
-            <h2 class="font-bold text-base text-slate-900 flex items-center gap-2">
-              <i data-lucide="shield" class="w-5 h-5 text-sky-600"></i>
-              <span>Manajemen Akses User</span>
-            </h2>
-            <p class="text-xs text-slate-500">Buat user baru, atur role, atau reset password.</p>
-          </div>
-          <button onclick="openModal('modalAddUser')" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-1.5 shadow">
-            <i data-lucide="user-plus" class="w-4 h-4"></i> Tambah User Baru
-          </button>
-        </div>
-
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs">
-            <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold">
-              <tr>
-                <th class="p-3">Nama Lengkap</th>
-                <th class="p-3">Username</th>
-                <th class="p-3">Role</th>
-                <th class="p-3 text-center">Aksi</th>
-              </tr>
-            </thead>
-            <tbody id="users-table-body" class="divide-y divide-slate-100">
-              <!-- Dynamically populated -->
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- ============================================================= -->
-    <!-- TAB 7: GALLERY MANAGEMENT (SUPER ADMIN)                       -->
-    <!-- ============================================================= -->
-    <div id="content-gallery-mgmt" class="tab-content hidden space-y-6">
-      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-        <div>
-          <h2 class="text-xl font-bold text-slate-900 flex items-center gap-2">
-            <i data-lucide="image" class="w-5 h-5 text-sky-600"></i> Manajemen Galeri Landing Page (Index)
-          </h2>
-          <p class="text-xs text-slate-500 mt-1">Super Admin dapat menambah, mengunggah, mengedit, atau menghapus foto dokumentasi yang tampil di halaman beranda (index.html).</p>
-        </div>
-        <button onclick="openModal('modalAddGallery')" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow transition flex items-center gap-2">
-          <i data-lucide="plus-circle" class="w-4 h-4"></i> Upload Foto Baru
-        </button>
-      </div>
-
-      <!-- Gallery Grid in Dashboard -->
-      <div id="gallery-mgmt-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        <!-- Rendered by app.js -->
-      </div>
-    </div>
-
-  </main>
+    </div> <!-- End Right Content Area -->
+  </div> <!-- End #app-container -->
 
   <!-- ============================================================= -->
   <!-- MODAL 1: TAMBAH WORK ORDER (WO) BARU                          -->
   <!-- ============================================================= -->
   <div id="modalAddProject" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+    <div
+      class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
-        <h3 class="font-bold text-slate-900 text-lg flex items-center gap-2">
+        <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
           <i data-lucide="folder-plus" class="w-5 h-5 text-sky-600"></i>
-          <span>Input Work Order (WO / SP) Baru</span>
+          <span>Input Work Order Baru</span>
         </h3>
-        <button onclick="closeModal('modalAddProject')" class="text-slate-400 hover:text-slate-600">
+        <button type="button" onclick="closeModal('modalAddProject')"
+          class="text-slate-400 hover:text-slate-600 cursor-pointer">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
       <form id="formAddProject" onsubmit="submitNewProject(event)" class="space-y-4 text-xs">
         <div>
-          <label class="block font-semibold text-slate-700 mb-1">Klien Utama *</label>
-          <select id="modal-client" required class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50">
+          <label for="modal-client" class="block font-semibold text-slate-700 mb-1">Klien Utama *</label>
+          <select id="modal-client" required
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 font-medium text-xs">
             <option value="Telkom Akses">Telkom Akses (Surat Pesanan / SP)</option>
             <option value="Icon Net (PLN)">Icon Net (PLN Icon Plus)</option>
             <option value="ID Net">ID Net</option>
           </select>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label class="block font-semibold text-slate-700 mb-1">Nomor SP / WO *</label>
-            <input type="text" id="modal-wo" required placeholder="Contoh: SP-TA-JKT-2026-0901" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+            <div class="flex items-center justify-between mb-1">
+              <label for="modal-sp-select" class="block font-semibold text-slate-700">Nomor SP/PO *</label>
+              <button type="button" id="btn-toggle-sp-input" onclick="toggleSpInputMode()"
+                class="text-[11px] font-semibold text-sky-600 hover:text-sky-700 cursor-pointer">
+                + Input SP Baru
+              </button>
+            </div>
+            <!-- Dropdown SP Eksisting -->
+            <select id="modal-sp-select" onchange="handleSpSelectChange(this.value)"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 text-xs">
+              <!-- Dynamically populated from existing projects -->
+            </select>
+            <!-- Input Text jika SP Baru atau diketik manual -->
+            <div id="container-custom-sp" class="hidden mt-1.5">
+              <input type="text" id="modal-wo" placeholder="Ketik nomor SP/PO baru..."
+                class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
+            </div>
           </div>
           <div>
-            <label class="block font-semibold text-slate-700 mb-1">Nama Klaster / STO / Relasi *</label>
-            <input type="text" id="modal-cluster" required placeholder="Contoh: STO Gambir - Klaster Petojo" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+            <label for="modal-cluster" class="block font-semibold text-slate-700 mb-1">Nama Pekerjaan / Lokasi *</label>
+            <input type="text" id="modal-cluster" required placeholder="Contoh: STO Gambir - Klaster Petojo"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
           </div>
         </div>
 
@@ -699,19 +1147,25 @@
             ⚡ Alokasi Eksekutor Proyek *
           </label>
           <div class="grid grid-cols-2 gap-2">
-            <label class="flex items-center space-x-2 bg-white p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:border-sky-500">
-              <input type="radio" name="modal_executor_type" value="Internal" onchange="toggleExecutorSelect()" class="text-sky-600">
+            <label
+              class="flex items-center space-x-2 bg-white p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:border-sky-500">
+              <input type="radio" name="modal_executor_type" value="Internal" onchange="toggleExecutorSelect()"
+                class="text-sky-600 cursor-pointer">
               <span class="font-semibold text-slate-800">Tim Internal Vendor</span>
             </label>
-            <label class="flex items-center space-x-2 bg-white p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:border-sky-500">
-              <input type="radio" name="modal_executor_type" value="Mandor" checked onchange="toggleExecutorSelect()" class="text-sky-600">
+            <label
+              class="flex items-center space-x-2 bg-white p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:border-sky-500">
+              <input type="radio" name="modal_executor_type" value="Mandor" checked onchange="toggleExecutorSelect()"
+                class="text-sky-600 cursor-pointer">
               <span class="font-semibold text-slate-800">Mandor / Subkon</span>
             </label>
           </div>
 
           <div>
-            <label class="block font-semibold text-slate-700 mb-1">Pilih Eksekutor Terdaftar *</label>
-            <select id="modal-executor-id" required class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white">
+            <label for="modal-executor-id" class="block font-semibold text-slate-700 mb-1">Pilih Eksekutor Terdaftar
+              *</label>
+            <select id="modal-executor-id" required
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white text-xs">
               <!-- Dynamically populated from executors -->
             </select>
           </div>
@@ -719,23 +1173,32 @@
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block font-semibold text-slate-700 mb-1">Nilai Kontrak Klien (Rp) *</label>
-            <input type="number" id="modal-contract-value" required placeholder="350000000" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+            <label for="modal-contract-value" class="block font-semibold text-slate-700 mb-1">Nilai BOQ (Rp) *</label>
+            <input type="number" id="modal-contract-value" required placeholder="350000000"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
           </div>
           <div>
-            <label class="block font-semibold text-slate-700 mb-1">Estimasi Biaya Upah/HPP (Rp) *</label>
-            <input type="number" id="modal-mandor-cost" required placeholder="185000000" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+            <label for="modal-mandor-cost" class="block font-semibold text-slate-700 mb-1">Estimasi Biaya Upah/HPP (Rp)
+              *</label>
+            <input type="number" id="modal-mandor-cost" required placeholder="185000000"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
           </div>
         </div>
 
         <div>
-          <label class="block font-semibold text-slate-700 mb-1">Target Tanggal Selesai *</label>
-          <input type="date" id="modal-target-date" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          <label for="modal-target-date" class="block font-semibold text-slate-700 mb-1">Target Tanggal Selesai
+            *</label>
+          <input type="date" id="modal-target-date" required
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
         </div>
 
         <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
-          <button type="button" onclick="closeModal('modalAddProject')" class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
-          <button type="submit" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow">Simpan Work Order</button>
+          <button type="button" onclick="closeModal('modalAddProject')"
+            class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">Batal</button>
+          <button type="submit"
+            class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow-xs transition cursor-pointer">Simpan
+            Work
+            Order</button>
         </div>
       </form>
     </div>
@@ -761,7 +1224,8 @@
 
         <div>
           <label class="block font-semibold text-slate-700 mb-1">Status Pengerjaan *</label>
-          <select id="modal-m-status" onchange="toggleBlockedReasonField()" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 font-medium">
+          <select id="modal-m-status" onchange="toggleBlockedReasonField()"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 font-medium">
             <option value="To-Do">To-Do (Abu-abu: Belum Dikerjakan)</option>
             <option value="In-Progress">In-Progress (Biru: Sedang Dikerjakan)</option>
             <option value="Blocked">Blocked (Merah: Terkendala Izin/Warga/Material)</option>
@@ -771,12 +1235,14 @@
 
         <div>
           <label class="block font-semibold text-slate-700 mb-1">Persentase Progres (%)</label>
-          <input type="number" id="modal-m-progress" min="0" max="100" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          <input type="number" id="modal-m-progress" min="0" max="100"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2">
         </div>
 
         <div id="field-blocked-reason" class="hidden">
           <label class="block font-semibold text-red-700 mb-1">Detail Kendala Lapangan (Blocked Reason) *</label>
-          <textarea id="modal-m-blocked" rows="2" placeholder="Contoh: Perizinan crossing rel KAI belum keluar..." class="w-full border border-red-300 bg-red-50/50 rounded-lg px-3 py-2"></textarea>
+          <textarea id="modal-m-blocked" rows="2" placeholder="Contoh: Perizinan crossing rel KAI belum keluar..."
+            class="w-full border border-red-300 bg-red-50/50 rounded-lg px-3 py-2"></textarea>
         </div>
 
         <!-- Khusus Stage Testing ATP: Input Loss OTDR & Redaman OPM -->
@@ -785,11 +1251,13 @@
           <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-slate-600 mb-0.5">Loss OTDR (dB/km)</label>
-              <input type="text" id="modal-m-otdr" placeholder="Misal: 0.21 dB/km" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white">
+              <input type="text" id="modal-m-otdr" placeholder="Misal: 0.21 dB/km"
+                class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white">
             </div>
             <div>
               <label class="block text-slate-600 mb-0.5">Redaman OPM (dBm)</label>
-              <input type="text" id="modal-m-opm" placeholder="Misal: -18.5 dBm" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white">
+              <input type="text" id="modal-m-opm" placeholder="Misal: -18.5 dBm"
+                class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white">
             </div>
           </div>
           <p class="text-[10px] text-slate-500">Standar Telkom: -16 s/d -24 dBm.</p>
@@ -797,12 +1265,16 @@
 
         <div>
           <label class="block font-semibold text-slate-700 mb-1">Catatan Lapangan PM</label>
-          <textarea id="modal-m-notes" rows="2" placeholder="Update progres fisik terkini..." class="w-full border border-slate-300 rounded-lg px-3 py-2"></textarea>
+          <textarea id="modal-m-notes" rows="2" placeholder="Update progres fisik terkini..."
+            class="w-full border border-slate-300 rounded-lg px-3 py-2"></textarea>
         </div>
 
         <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
-          <button type="button" onclick="closeModal('modalUpdateMilestone')" class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
-          <button type="submit" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow">Simpan Perubahan</button>
+          <button type="button" onclick="closeModal('modalUpdateMilestone')"
+            class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
+          <button type="submit"
+            class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow">Simpan
+            Perubahan</button>
         </div>
       </form>
     </div>
@@ -811,47 +1283,273 @@
   <!-- ============================================================= -->
   <!-- MODAL 3: TAMBAH TAGIHAN TERMIN / INVOICE                      -->
   <!-- ============================================================= -->
+  <!-- MODAL: BUAT TAGIHAN TERMIN BARU                               -->
+  <!-- ============================================================= -->
   <div id="modalAddInvoice" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
       <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
-        <h3 class="font-bold text-slate-900 text-base">Buat Tagihan Termin Baru</h3>
-        <button onclick="closeModal('modalAddInvoice')" class="text-slate-400 hover:text-slate-600">
+        <h3 class="font-bold text-slate-900 text-base">Buat Tagihan Baru</h3>
+        <button type="button" onclick="closeModal('modalAddInvoice')" class="text-slate-400 hover:text-slate-600 cursor-pointer">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
       <form id="formAddInvoice" onsubmit="submitNewInvoice(event)" class="space-y-4 text-xs">
         <div>
-          <label class="block font-semibold text-slate-700 mb-1">Pilih Work Order *</label>
-          <select id="modal-inv-project" onchange="autoFillInvoiceProjectInfo()" required class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50">
-            <!-- Dynamically populated -->
+          <label for="modal-inv-id" class="block font-semibold text-slate-700 mb-1">ID Invoice *</label>
+          <input type="text" id="modal-inv-id" required placeholder="Contoh: INV-2026-001"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono">
+          <p class="text-[11px] text-slate-400 mt-1">Nomor atau ID invoice dimasukkan secara manual.</p>
+        </div>
+
+        <div>
+          <label for="modal-inv-sp" class="block font-semibold text-slate-700 mb-1">Nomor SP/PO *</label>
+          <select id="modal-inv-sp" onchange="onInvoiceSpChange()" required
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 text-xs font-medium">
+            <!-- Populated with UNIQUE SP/PO only -->
           </select>
         </div>
 
         <div>
-          <label class="block font-semibold text-slate-700 mb-1">Nama Termin / Deskripsi *</label>
-          <input type="text" id="modal-inv-term" required placeholder="Contoh: Termin 2: Progres Lapangan 70%" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          <label class="block font-semibold text-slate-700 mb-1">Nama Work Order</label>
+          <div id="display-inv-wo-name" class="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 font-medium text-xs">
+            -- Pilih Nomor SP/PO terlebih dahulu --
+          </div>
+          <div id="container-inv-job-select" class="hidden mt-1.5 space-y-1">
+            <label for="modal-inv-job" class="block text-[11px] font-semibold text-slate-600">Pilih Pekerjaan di SP ini:</label>
+            <select id="modal-inv-job" onchange="onInvoiceJobChange()" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 text-xs font-medium">
+              <!-- Dynamically populated if > 1 job under this SP -->
+            </select>
+          </div>
+          <input type="hidden" id="modal-inv-term">
+          <input type="hidden" id="modal-inv-project-id">
         </div>
 
         <div>
-          <label class="block font-semibold text-slate-700 mb-1">Nominal Tagihan (Rp) *</label>
-          <input type="number" id="modal-inv-amount" required placeholder="125000000" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          <label for="modal-inv-amount" class="block font-semibold text-slate-700 mb-1">Nominal Tagihan (Rp) *</label>
+          <input type="number" id="modal-inv-amount" required placeholder="Contoh: 125000000"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block font-semibold text-slate-700 mb-1">Tanggal Invoice *</label>
-            <input type="date" id="modal-inv-date" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
-          </div>
-          <div>
-            <label class="block font-semibold text-slate-700 mb-1">Jatuh Tempo *</label>
-            <input type="date" id="modal-inv-due" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
-          </div>
+        <div>
+          <label for="modal-inv-date" class="block font-semibold text-slate-700 mb-1">Tanggal Invoice *</label>
+          <input type="date" id="modal-inv-date" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
+          <p class="text-[11px] text-slate-400 mt-1">Jatuh tempo otomatis dihitung 2 bulan dari tanggal invoice.</p>
         </div>
 
         <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
-          <button type="button" onclick="closeModal('modalAddInvoice')" class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
-          <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold shadow">Terbitkan Tagihan</button>
+          <button type="button" onclick="closeModal('modalAddInvoice')"
+            class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">Batal</button>
+          <button type="submit"
+            class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold shadow-xs transition cursor-pointer">Terbitkan
+            Tagihan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- MODAL: EDIT TAGIHAN INVOICE                                   -->
+  <!-- ============================================================= -->
+  <div id="modalEditInvoice" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+        <h3 class="font-bold text-slate-900 text-lg flex items-center gap-2">
+          <i data-lucide="file-edit" class="w-5 h-5 text-sky-600"></i>
+          <span>Edit Data Tagihan (Invoice)</span>
+        </h3>
+        <button type="button" onclick="closeModal('modalEditInvoice')" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="formEditInvoice" onsubmit="submitEditInvoice(event)" class="space-y-3.5 text-xs">
+        <input type="hidden" id="edit-inv-id">
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">ID Invoice</label>
+          <input type="text" id="edit-display-inv-id" readonly
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-100 font-mono text-slate-600 cursor-not-allowed">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="edit-inv-wo" class="block font-semibold text-slate-700 mb-1">Nomor SP/PO *</label>
+            <input type="text" id="edit-inv-wo" required class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 font-mono">
+          </div>
+          <div>
+            <label for="edit-inv-client" class="block font-semibold text-slate-700 mb-1">Klien *</label>
+            <input type="text" id="edit-inv-client" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          </div>
+        </div>
+
+        <div>
+          <label for="edit-inv-term" class="block font-semibold text-slate-700 mb-1">Nama Work Order / Termin *</label>
+          <input type="text" id="edit-inv-term" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="edit-inv-amount" class="block font-semibold text-slate-700 mb-1">Nominal Tagihan (Rp) *</label>
+            <input type="number" id="edit-inv-amount" required class="w-full border border-slate-300 rounded-lg px-3 py-2 font-semibold">
+          </div>
+          <div>
+            <label for="edit-inv-status" class="block font-semibold text-slate-700 mb-1">Status Pembayaran *</label>
+            <select id="edit-inv-status" onchange="toggleEditInvoicePaidDate()" class="w-full border border-slate-300 rounded-lg px-3 py-2 font-medium">
+              <option value="Draft">Draft</option>
+              <option value="BAST Terbit">BAST Terbit</option>
+              <option value="Belum Cashbank">Belum Cashbank</option>
+              <option value="Sudah Cashbank">Sudah Cashbank</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="edit-inv-date" class="block font-semibold text-slate-700 mb-1">Tanggal Invoice *</label>
+            <input type="date" id="edit-inv-date" onchange="updateEditInvoiceDueDate()" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          </div>
+          <div>
+            <label for="edit-inv-due" class="block font-semibold text-slate-700 mb-1">Jatuh Tempo *</label>
+            <input type="date" id="edit-inv-due" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          </div>
+        </div>
+
+        <div id="container-edit-inv-paid" class="hidden">
+          <label for="edit-inv-paid-date" class="block font-semibold text-emerald-800 mb-1">Tanggal Pelunasan</label>
+          <input type="date" id="edit-inv-paid-date" class="w-full border border-emerald-300 rounded-lg px-3 py-2 bg-emerald-50 text-emerald-900">
+        </div>
+
+        <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('modalEditInvoice')"
+            class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">Batal</button>
+          <button type="submit"
+            class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow-xs transition cursor-pointer">Simpan Perubahan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- MODAL: CATAT KAS KELUAR / KLAIM MANDOR BARU                   -->
+  <!-- ============================================================= -->
+  <div id="modalAddMandorPayout" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+        <h3 class="font-bold text-slate-900 text-lg flex items-center gap-2">
+          <i data-lucide="badge-dollar-sign" class="w-5 h-5 text-emerald-600"></i>
+          <span>Catat Kas Keluar / Klaim Mandor</span>
+        </h3>
+        <button type="button" onclick="closeModal('modalAddMandorPayout')" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="formAddMandorPayout" onsubmit="submitNewMandorPayout(event)" class="space-y-3.5 text-xs">
+        <div>
+          <label for="add-pay-project" class="block font-semibold text-slate-700 mb-1">Terkait Proyek / Pekerjaan</label>
+          <select id="add-pay-project" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50">
+            <!-- Dynamically populated from projects -->
+          </select>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="add-pay-mandor" class="block font-semibold text-slate-700 mb-1">Nama Mandor / Penerima *</label>
+            <input type="text" id="add-pay-mandor" required placeholder="Contoh: Mandor Sugeng"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          </div>
+          <div>
+            <label for="add-pay-stage" class="block font-semibold text-slate-700 mb-1">Tahap / Keperluan *</label>
+            <select id="add-pay-stage" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+              <option value="Penanaman Tiang (Pole)">Penanaman Tiang (Pole)</option>
+              <option value="Penarikan Kabel (KU Fiber)">Penarikan Kabel (KU Fiber)</option>
+              <option value="Pemasangan ODP & Fat Box">Pemasangan ODP & Fat Box</option>
+              <option value="Splicing & Terminasi Core">Splicing & Terminasi Core</option>
+              <option value="ATP & Uji OTDR">ATP & Uji OTDR</option>
+              <option value="Operasional Lapangan & Transport">Operasional Lapangan & Transport</option>
+              <option value="Lain-lain">Lain-lain</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label for="add-pay-amount" class="block font-semibold text-slate-700 mb-1">Nominal Upah / Kas Keluar (Rp) *</label>
+          <input type="number" id="add-pay-amount" required placeholder="Contoh: 15000000"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 font-semibold">
+        </div>
+
+        <div>
+          <label for="add-pay-notes" class="block font-semibold text-slate-700 mb-1">Catatan Keterangan</label>
+          <textarea id="add-pay-notes" rows="2" placeholder="Keterangan pengeluaran atau detail klaim mandor"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2"></textarea>
+        </div>
+
+        <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('modalAddMandorPayout')"
+            class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">Batal</button>
+          <button type="submit"
+            class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold shadow-xs transition cursor-pointer">Simpan Kas Keluar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- MODAL: EDIT KAS KELUAR / KLAIM MANDOR                         -->
+  <!-- ============================================================= -->
+  <div id="modalEditMandorPayout" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+        <h3 class="font-bold text-slate-900 text-lg flex items-center gap-2">
+          <i data-lucide="edit-3" class="w-5 h-5 text-sky-600"></i>
+          <span>Edit Kas Keluar / Klaim Mandor</span>
+        </h3>
+        <button type="button" onclick="closeModal('modalEditMandorPayout')" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="formEditMandorPayout" onsubmit="submitEditMandorPayout(event)" class="space-y-3.5 text-xs">
+        <input type="hidden" id="edit-pay-id">
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="edit-pay-mandor" class="block font-semibold text-slate-700 mb-1">Nama Mandor / Penerima *</label>
+            <input type="text" id="edit-pay-mandor" required class="w-full border border-slate-300 rounded-lg px-3 py-2 font-semibold">
+          </div>
+          <div>
+            <label for="edit-pay-stage" class="block font-semibold text-slate-700 mb-1">Tahap / Keperluan *</label>
+            <input type="text" id="edit-pay-stage" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="edit-pay-amount" class="block font-semibold text-slate-700 mb-1">Nominal Upah (Rp) *</label>
+            <input type="number" id="edit-pay-amount" required class="w-full border border-slate-300 rounded-lg px-3 py-2 font-semibold">
+          </div>
+          <div>
+            <label for="edit-pay-status" class="block font-semibold text-slate-700 mb-1">Status Pembayaran *</label>
+            <select id="edit-pay-status" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+              <option value="Pending Verifikasi">Pending Verifikasi</option>
+              <option value="Disetujui PM">Disetujui PM</option>
+              <option value="Lunas">Lunas</option>
+              <option value="Ditolak / Pending Verifikasi">Ditolak / Pending Verifikasi</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label for="edit-pay-notes" class="block font-semibold text-slate-700 mb-1">Catatan Keterangan</label>
+          <textarea id="edit-pay-notes" rows="2" class="w-full border border-slate-300 rounded-lg px-3 py-2"></textarea>
+        </div>
+
+        <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeModal('modalEditMandorPayout')"
+            class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">Batal</button>
+          <button type="submit"
+            class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow-xs transition cursor-pointer">Simpan Perubahan</button>
         </div>
       </form>
     </div>
@@ -874,15 +1572,18 @@
       <form id="formAddUser" onsubmit="submitNewUser(event)" class="space-y-4 text-xs">
         <div>
           <label class="block font-semibold text-slate-700 mb-1">Nama Lengkap *</label>
-          <input type="text" id="modal-user-name" required placeholder="Contoh: Budi Santoso" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          <input type="text" id="modal-user-name" required placeholder="Contoh: Budi Santoso"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2">
         </div>
         <div>
           <label class="block font-semibold text-slate-700 mb-1">Username *</label>
-          <input type="text" id="modal-user-username" required placeholder="Contoh: budi_pm" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          <input type="text" id="modal-user-username" required placeholder="Contoh: budi_pm"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2">
         </div>
         <div>
           <label class="block font-semibold text-slate-700 mb-1">Password *</label>
-          <input type="text" id="modal-user-password" required placeholder="Password sementara" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          <input type="text" id="modal-user-password" required placeholder="Password sementara"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2">
         </div>
         <div>
           <label class="block font-semibold text-slate-700 mb-1">Role *</label>
@@ -893,8 +1594,10 @@
           </select>
         </div>
         <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
-          <button type="button" onclick="closeModal('modalAddUser')" class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
-          <button type="submit" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow">Simpan</button>
+          <button type="button" onclick="closeModal('modalAddUser')"
+            class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
+          <button type="submit"
+            class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow">Simpan</button>
         </div>
       </form>
     </div>
@@ -916,14 +1619,19 @@
       </div>
       <form id="formResetPassword" onsubmit="submitResetPassword(event)" class="space-y-4 text-xs">
         <input type="hidden" id="modal-reset-user-id">
-        <p class="text-slate-600">Masukkan password baru untuk user: <b id="modal-reset-username" class="text-slate-900"></b></p>
+        <p class="text-slate-600">Masukkan password baru untuk user: <b id="modal-reset-username"
+            class="text-slate-900"></b></p>
         <div>
           <label class="block font-semibold text-slate-700 mb-1">Password Baru *</label>
-          <input type="text" id="modal-reset-new-password" required placeholder="Password baru" class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          <input type="text" id="modal-reset-new-password" required placeholder="Password baru"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2">
         </div>
         <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
-          <button type="button" onclick="closeModal('modalResetPassword')" class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
-          <button type="submit" class="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-semibold shadow">Update Password</button>
+          <button type="button" onclick="closeModal('modalResetPassword')"
+            class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
+          <button type="submit"
+            class="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-semibold shadow">Update
+            Password</button>
         </div>
       </form>
     </div>
@@ -933,46 +1641,119 @@
   <!-- MODAL: EDIT / TAMBAH EKSEKUTOR                                -->
   <!-- ============================================================= -->
   <div id="modalEditExecutor" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+    <div
+      class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
-        <h3 class="font-bold text-slate-900 text-lg flex items-center gap-2">
-          <i data-lucide="edit" class="w-5 h-5 text-sky-600"></i>
+        <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+          <i data-lucide="users" class="w-5 h-5 text-sky-600"></i>
           <span id="executorModalTitle">Data Eksekutor</span>
         </h3>
-        <button onclick="closeModal('modalEditExecutor')" class="text-slate-400 hover:text-slate-600">
+        <button type="button" onclick="closeModal('modalEditExecutor')"
+          class="text-slate-400 hover:text-slate-600 cursor-pointer">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
       <form id="formEditExecutor" onsubmit="submitExecutor(event)" class="space-y-4 text-xs">
         <input type="hidden" id="modal-exec-id">
+
         <div>
-          <label class="block font-semibold text-slate-700 mb-1">Nama Tim / Mandor *</label>
-          <input type="text" id="modal-exec-name" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          <label class="block font-semibold text-slate-700 mb-1.5">Tipe Eksekutor *</label>
+          <div class="grid grid-cols-2 gap-2">
+            <label
+              class="flex items-center space-x-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:border-sky-500">
+              <input type="radio" name="modal_form_exec_type" value="Internal" onchange="onModalExecTypeChange()"
+                class="text-sky-600 cursor-pointer">
+              <div>
+                <span class="font-semibold text-slate-800 text-xs block">Tim Internal</span>
+                <span class="text-[10px] text-slate-500 block">Karyawan & armada PT AKU</span>
+              </div>
+            </label>
+            <label
+              class="flex items-center space-x-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:border-sky-500">
+              <input type="radio" name="modal_form_exec_type" value="Mandor" checked onchange="onModalExecTypeChange()"
+                class="text-sky-600 cursor-pointer">
+              <div>
+                <span class="font-semibold text-slate-800 text-xs block">Mandor / Subkon</span>
+                <span class="text-[10px] text-slate-500 block">Mitra rekanan borongan</span>
+              </div>
+            </label>
+          </div>
         </div>
-        <div>
-          <label class="block font-semibold text-slate-700 mb-1">Tipe Eksekutor *</label>
-          <select id="modal-exec-type" required class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white">
-            <option value="Internal">Tim Internal</option>
-            <option value="Mandor">Mandor / Subkon</option>
-          </select>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label class="block font-semibold text-slate-700 mb-1">Nomor Telepon *</label>
-            <input type="text" id="modal-exec-phone" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
+            <label for="modal-exec-name" class="block font-semibold text-slate-700 mb-1">Nama Tim / Mandor *</label>
+            <input type="text" id="modal-exec-name" required placeholder="Contoh: Tim Alpha / Mandor Sutrisno"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
           </div>
           <div>
-            <label class="block font-semibold text-slate-700 mb-1">Nomor Armada / Plat</label>
-            <input type="text" id="modal-exec-fleet" class="w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="Contoh: B-1234-XYZ">
+            <label for="modal-exec-pic" class="block font-semibold text-slate-700 mb-1">Koordinator / PIC
+              Lapangan</label>
+            <input type="text" id="modal-exec-pic" placeholder="Contoh: Pak Sutrisno"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
           </div>
         </div>
-        <div>
-          <label class="block font-semibold text-slate-700 mb-1">Standar Tarif / Upah</label>
-          <textarea id="modal-exec-rates" rows="3" class="w-full border border-slate-300 rounded-lg px-3 py-2" placeholder="Contoh: Tiang: Rp 65.000/btg"></textarea>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="modal-exec-phone" class="block font-semibold text-slate-700 mb-1">Nomor WhatsApp / HP *</label>
+            <input type="text" id="modal-exec-phone" required placeholder="Contoh: 0812-3456-7890"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
+          </div>
+          <div>
+            <label for="modal-exec-fleet" class="block font-semibold text-slate-700 mb-1">Nomor Armada / Plat
+              Kendaraan</label>
+            <input type="text" id="modal-exec-fleet" placeholder="Contoh: L-9142-TA / GranMax"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
+          </div>
         </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="modal-exec-wilayah" class="block font-semibold text-slate-700 mb-1">Wilayah / Basecamp</label>
+            <input type="text" id="modal-exec-wilayah" placeholder="Contoh: Surabaya & Sidoarjo"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
+          </div>
+          <div>
+            <label for="modal-exec-specialization" class="block font-semibold text-slate-700 mb-1">Spesialisasi
+              Keahlian</label>
+            <input type="text" id="modal-exec-specialization" placeholder="Contoh: FTTH OSP, Tanam Tiang, Splicing"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
+          </div>
+        </div>
+
+        <div>
+          <label for="modal-exec-rates" class="block font-semibold text-slate-700 mb-1">Standar Biaya / Upah / Uang
+            Jalan</label>
+          <textarea id="modal-exec-rates" rows="2"
+            placeholder="Contoh untuk Internal: Uang Jalan Rp 450.000/hari + BBM. Untuk Mandor: Tiang Rp 65.000/btg, Tarik KU Rp 1.800/m"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs"></textarea>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="modal-exec-status" class="block font-semibold text-slate-700 mb-1">Status Kesiapan</label>
+            <select id="modal-exec-status"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-slate-50 font-medium">
+              <option value="Aktif">Aktif (Sedang Bertugas / Siap)</option>
+              <option value="Standby">Standby (Bebas Tugas / Menunggu WO)</option>
+              <option value="Non-Aktif">Non-Aktif (Cuti / Perbaikan)</option>
+            </select>
+          </div>
+          <div>
+            <label for="modal-exec-rating" class="block font-semibold text-slate-700 mb-1">Rating Performa (1.0 -
+              5.0)</label>
+            <input type="number" id="modal-exec-rating" step="0.1" min="1.0" max="5.0" value="5.0"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
+          </div>
+        </div>
+
         <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
-          <button type="button" onclick="closeModal('modalEditExecutor')" class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50">Batal</button>
-          <button type="submit" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow">Simpan</button>
+          <button type="button" onclick="closeModal('modalEditExecutor')"
+            class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">Batal</button>
+          <button type="submit"
+            class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow-xs transition cursor-pointer flex items-center gap-1.5"><i
+              data-lucide="check" class="w-4 h-4"></i> Simpan Data</button>
         </div>
       </form>
     </div>
@@ -980,7 +1761,8 @@
 
   <!-- MODAL: MASTER MATERIAL -->
   <div id="modalManageMaterials" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+    <div
+      class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
       <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
         <h3 class="font-bold text-slate-900 text-lg flex items-center gap-2">
           <i data-lucide="settings" class="w-5 h-5 text-sky-600"></i>
@@ -991,10 +1773,12 @@
         </button>
       </div>
 
-      <form onsubmit="submitMaterialForm(event)" class="grid grid-cols-1 sm:grid-cols-12 gap-2 mb-5 pb-5 border-b border-slate-100">
+      <form onsubmit="submitMaterialForm(event)"
+        class="grid grid-cols-1 sm:grid-cols-12 gap-2 mb-5 pb-5 border-b border-slate-100">
         <input type="hidden" id="edit-mat-id">
         <div class="sm:col-span-4">
-          <input type="text" id="new-mat-name" required placeholder="Nama material" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
+          <input type="text" id="new-mat-name" required placeholder="Nama material"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
         </div>
         <div class="sm:col-span-3">
           <select id="new-mat-category" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white">
@@ -1007,23 +1791,30 @@
           </select>
         </div>
         <div class="sm:col-span-2">
-          <input type="text" id="new-mat-variant" placeholder="Varian" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
+          <input type="text" id="new-mat-variant" placeholder="Varian"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
         </div>
         <div class="sm:col-span-2">
-          <input type="text" id="new-mat-unit" placeholder="Satuan" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
+          <input type="text" id="new-mat-unit" placeholder="Satuan"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
         </div>
         <div class="sm:col-span-1 flex gap-1">
-          <button type="submit" id="btn-submit-material" class="flex-1 bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-3 py-2 rounded-lg">+</button>
-          <button type="button" id="btn-cancel-edit-material" onclick="cancelEditMaterial()" class="hidden flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold px-3 py-2 rounded-lg">Batal</button>
+          <button type="submit" id="btn-submit-material"
+            class="flex-1 bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-3 py-2 rounded-lg">+</button>
+          <button type="button" id="btn-cancel-edit-material" onclick="cancelEditMaterial()"
+            class="hidden flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold px-3 py-2 rounded-lg">Batal</button>
         </div>
         <div class="sm:col-span-4">
-          <input type="number" id="new-mat-stock" min="0" placeholder="Stok gudang" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
+          <input type="number" id="new-mat-stock" min="0" placeholder="Stok gudang"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
         </div>
         <div class="sm:col-span-4">
-          <input type="number" id="new-mat-min" min="0" placeholder="Min. stok (alert restock)" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
+          <input type="number" id="new-mat-min" min="0" placeholder="Min. stok (alert restock)"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
         </div>
         <div class="sm:col-span-4 flex items-center">
-          <p class="text-[10px] text-slate-400 leading-tight">Stok gudang tampil di Executive Dashboard. Material dengan stok di bawah minimum ditandai "Rendah".</p>
+          <p class="text-[10px] text-slate-400 leading-tight">Stok gudang tampil di Executive Dashboard. Material dengan
+            stok di bawah minimum ditandai "Rendah".</p>
         </div>
       </form>
 
@@ -1046,12 +1837,14 @@
       <form id="formAddGallery" onsubmit="submitNewGallery(event)" class="space-y-4 text-xs">
         <div>
           <label class="block font-semibold text-slate-700 mb-1">Judul Aktivitas / Foto *</label>
-          <input type="text" id="modal-gal-title" required placeholder="Contoh: Penanaman Tiang Area Sentul" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-sky-500">
+          <input type="text" id="modal-gal-title" required placeholder="Contoh: Penanaman Tiang Area Sentul"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-sky-500">
         </div>
 
         <div>
           <label class="block font-semibold text-slate-700 mb-1">Pilihan Kategori Foto *</label>
-          <select id="modal-gal-category" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-slate-50 font-medium focus:ring-2 focus:ring-sky-500">
+          <select id="modal-gal-category" required
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-slate-50 font-medium focus:ring-2 focus:ring-sky-500">
             <option value="lapangan">Konstruksi & OSP (Penanaman Tiang, Tarik Kabel, Box ODP)</option>
             <option value="splicing">Splicing & ODC (Penyambungan Core, Server Rack)</option>
             <option value="qc">Pengujian & QC (Ukur OTDR, OPM, Validasi BAST)</option>
@@ -1065,24 +1858,29 @@
 
         <div>
           <label class="block font-semibold text-slate-700 mb-1">Deskripsi Singkat</label>
-          <input type="text" id="modal-gal-desc" placeholder="Contoh: Tim Bravo menyelesaikan 20 titik ODP" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-sky-500">
+          <input type="text" id="modal-gal-desc" placeholder="Contoh: Tim Bravo menyelesaikan 20 titik ODP"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-sky-500">
         </div>
 
         <div>
           <label class="block font-semibold text-slate-700 mb-1">Pilih File Foto (JPG/PNG) *</label>
-          <input type="file" id="modal-gal-file" accept="image/*" onchange="previewGalleryImage(event)" required class="w-full border border-slate-300 rounded-lg p-2 text-xs bg-slate-50 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100">
-          
+          <input type="file" id="modal-gal-file" accept="image/*" onchange="previewGalleryImage(event)" required
+            class="w-full border border-slate-300 rounded-lg p-2 text-xs bg-slate-50 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100">
+
           <!-- Image Live Preview -->
-          <div id="gal-preview-container" class="mt-2 hidden rounded-xl overflow-hidden border border-slate-200 bg-slate-100 p-1 flex items-center justify-center max-h-48">
+          <div id="gal-preview-container"
+            class="mt-2 hidden rounded-xl overflow-hidden border border-slate-200 bg-slate-100 p-1 flex items-center justify-center max-h-48">
             <img id="gal-preview-img" src="" alt="Pratinjau Foto" class="max-h-44 object-contain rounded-lg">
           </div>
         </div>
 
         <div class="pt-3 border-t border-slate-100 flex justify-end gap-2">
-          <button type="button" onclick="closeModal('modalAddGallery')" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition">
+          <button type="button" onclick="closeModal('modalAddGallery')"
+            class="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition">
             Batal
           </button>
-          <button type="submit" id="btnSubmitGallery" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-bold shadow transition flex items-center gap-1.5">
+          <button type="submit" id="btnSubmitGallery"
+            class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-bold shadow transition flex items-center gap-1.5">
             <i data-lucide="upload" class="w-4 h-4"></i> Upload & Publikasikan
           </button>
         </div>
@@ -1091,7 +1889,8 @@
   </div>
 
   <!-- MODAL EDIT FOTO GALERI (SUPER ADMIN ONLY) -->
-  <div id="modalEditGallery" class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+  <div id="modalEditGallery"
+    class="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
       <div class="flex justify-between items-center border-b border-slate-100 pb-3">
         <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
@@ -1106,12 +1905,14 @@
         <input type="hidden" id="modal-edit-gal-id">
         <div>
           <label class="block font-semibold text-slate-700 mb-1">Judul Aktivitas / Foto *</label>
-          <input type="text" id="modal-edit-gal-title" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-sky-500">
+          <input type="text" id="modal-edit-gal-title" required
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-sky-500">
         </div>
 
         <div>
           <label class="block font-semibold text-slate-700 mb-1">Pilihan Kategori Foto *</label>
-          <select id="modal-edit-gal-category" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-slate-50 font-medium focus:ring-2 focus:ring-sky-500">
+          <select id="modal-edit-gal-category" required
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-slate-50 font-medium focus:ring-2 focus:ring-sky-500">
             <option value="lapangan">Konstruksi & OSP (Penanaman Tiang, Tarik Kabel, Box ODP)</option>
             <option value="splicing">Splicing & ODC (Penyambungan Core, Server Rack)</option>
             <option value="qc">Pengujian & QC (Ukur OTDR, OPM, Validasi BAST)</option>
@@ -1125,24 +1926,30 @@
 
         <div>
           <label class="block font-semibold text-slate-700 mb-1">Deskripsi Singkat</label>
-          <input type="text" id="modal-edit-gal-desc" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-sky-500">
+          <input type="text" id="modal-edit-gal-desc"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-sky-500">
         </div>
 
         <div>
-          <label class="block font-semibold text-slate-700 mb-1">Ganti File Foto (Opsional, biarkan kosong jika tetap)</label>
-          <input type="file" id="modal-edit-gal-file" accept="image/*" onchange="previewEditGalleryImage(event)" class="w-full border border-slate-300 rounded-lg p-2 text-xs bg-slate-50 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100">
-          
+          <label class="block font-semibold text-slate-700 mb-1">Ganti File Foto (Opsional, biarkan kosong jika
+            tetap)</label>
+          <input type="file" id="modal-edit-gal-file" accept="image/*" onchange="previewEditGalleryImage(event)"
+            class="w-full border border-slate-300 rounded-lg p-2 text-xs bg-slate-50 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100">
+
           <!-- Image Live Preview -->
-          <div id="gal-edit-preview-container" class="mt-2 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 p-1 flex items-center justify-center max-h-48">
+          <div id="gal-edit-preview-container"
+            class="mt-2 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 p-1 flex items-center justify-center max-h-48">
             <img id="gal-edit-preview-img" src="" alt="Pratinjau Foto" class="max-h-44 object-contain rounded-lg">
           </div>
         </div>
 
         <div class="pt-3 border-t border-slate-100 flex justify-end gap-2">
-          <button type="button" onclick="closeModal('modalEditGallery')" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition">
+          <button type="button" onclick="closeModal('modalEditGallery')"
+            class="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition">
             Batal
           </button>
-          <button type="submit" id="btnSubmitEditGallery" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-bold shadow transition flex items-center gap-1.5">
+          <button type="submit" id="btnSubmitEditGallery"
+            class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-bold shadow transition flex items-center gap-1.5">
             <i data-lucide="check" class="w-4 h-4"></i> Simpan Perubahan
           </button>
         </div>
@@ -1150,15 +1957,168 @@
     </div>
   </div>
 
-  <!-- FOOTER -->
-  <footer class="bg-slate-900 border-t border-slate-800 text-slate-400 text-xs py-4 px-4 text-center mt-auto space-y-1">
-    <p class="font-medium text-slate-300">PT Akses Kwalitas Unggul &copy; 2026 • Sistem Monitoring Pekerjaan & Keuangan Vendor FTTH</p>
-    <p class="text-[11px] text-slate-400">
-      Kantor: Jl. Dukuh Setro 7-19A Surabaya | Telp: <a href="tel:03151500050" class="hover:text-white underline">031-51500050</a> | WA: <a href="https://wa.me/6285850447888" target="_blank" rel="noopener" class="text-emerald-400 hover:text-emerald-300 font-semibold underline">0858-5044-7888</a> | Email: <a href="mailto:admin@akseskwalitasunggul.com" class="hover:text-white underline">admin@akseskwalitasunggul.com</a>
-    </p>
-  </footer>
+  <!-- ============================================================= -->
+  <!-- MODAL: INPUT MATERIAL DATANG (GUDANG INBOUND)                 -->
+  <!-- ============================================================= -->
+  <div id="modalMaterialInbound" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+        <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+          <i data-lucide="arrow-down-circle" class="w-5 h-5 text-emerald-600"></i>
+          <span>Catat Material Datang ke Gudang</span>
+        </h3>
+        <button onclick="closeModal('modalMaterialInbound')" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="formMaterialInbound" onsubmit="submitMaterialInbound(event)" class="space-y-4 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Pilih Material *</label>
+          <select id="inb-modal-material" required
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 font-medium">
+            <!-- Populated dynamically -->
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Jumlah Masuk (Qty) *</label>
+            <input type="number" id="inb-modal-qty" min="1" required placeholder="Contoh: 50"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Tanggal Tiba *</label>
+            <input type="date" id="inb-modal-date" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Asal Barang / Supplier / No. Surat Jalan</label>
+          <input type="text" id="inb-modal-supplier" placeholder="Contoh: PT Fiber Optik Nusantara / SJ-9981"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Catatan Tambahan</label>
+          <textarea id="inb-modal-notes" rows="2" placeholder="Kondisi barang, drum nomor berapa, dll..."
+            class="w-full border border-slate-300 rounded-lg px-3 py-2"></textarea>
+        </div>
+
+        <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-[11px] text-emerald-800">
+          <p class="font-semibold flex items-center gap-1.5">
+            <i data-lucide="info" class="w-3.5 h-3.5 shrink-0"></i>
+            <span>Stok gudang pada Master Material akan otomatis bertambah saat data disimpan.</span>
+          </p>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('modalMaterialInbound')"
+            class="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition cursor-pointer">
+            Batal
+          </button>
+          <button type="submit"
+            class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold shadow transition flex items-center gap-1.5 cursor-pointer">
+            <i data-lucide="check" class="w-4 h-4"></i> Simpan Stok Masuk
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- MODAL: RIWAYAT MATERIAL DATANG                                -->
+  <!-- ============================================================= -->
+  <div id="modalHistoryInbound" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
+    <div
+      class="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-2xl border border-slate-200 max-h-[85vh] flex flex-col">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4 shrink-0">
+        <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+          <i data-lucide="history" class="w-5 h-5 text-sky-600"></i>
+          <span>Riwayat Material Datang ke Gudang</span>
+        </h3>
+        <button onclick="closeModal('modalHistoryInbound')" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase font-semibold sticky top-0">
+            <tr>
+              <th class="p-3">Tanggal</th>
+              <th class="p-3">Material</th>
+              <th class="p-3 text-center">Jumlah Masuk</th>
+              <th class="p-3">Supplier / Surat Jalan</th>
+              <th class="p-3">Dicatat Oleh</th>
+              <th class="p-3 text-center">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="inbound-history-tbody" class="divide-y divide-slate-100">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================= -->
+  <!-- MODAL: TAMBAH USER BOT TELEGRAM (SUPERADMIN)                  -->
+  <!-- ============================================================= -->
+  <div id="modalAddTelegramUser" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+        <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+          <i data-lucide="send" class="w-5 h-5 text-sky-600"></i>
+          <span>Tambah Akun Bot Telegram</span>
+        </h3>
+        <button onclick="closeModal('modalAddTelegramUser')" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="formAddTelegramUser" onsubmit="submitNewTelegramUser(event)" class="space-y-4 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">ID Telegram Pengguna (Angka) *</label>
+          <input type="text" id="modal-tg-id" required placeholder="Contoh: 123456789"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 font-mono">
+          <p class="text-[10px] text-slate-400 mt-1">User dapat mengetahui ID mereka dengan mengirim pesan /myid ke bot.
+          </p>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Nama Lengkap Pengguna *</label>
+          <input type="text" id="modal-tg-name" required placeholder="Contoh: Rudi Setiawan (Teknisi)"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Role Bot Telegram *</label>
+          <select id="modal-tg-role" required
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 font-medium">
+            <option value="teknisi">Teknisi (Hanya Request & Cek Status)</option>
+            <option value="admin">Admin (Request, Inbound Masuk & Cek Stok)</option>
+            <option value="pm">Project Manager (Otorisasi / Approval Bon & Inbound)</option>
+            <option value="superadmin">Superadmin (Seluruh Akses & Dashboard Bot)</option>
+          </select>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex justify-end gap-2">
+          <button type="button" onclick="closeModal('modalAddTelegramUser')"
+            class="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition cursor-pointer">
+            Batal
+          </button>
+          <button type="submit"
+            class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-bold shadow transition flex items-center gap-1.5 cursor-pointer">
+            <i data-lucide="check" class="w-4 h-4"></i> Daftarkan User
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- Frontend Logic Script -->
   <script src="/app.js"></script>
 </body>
+
 </html>

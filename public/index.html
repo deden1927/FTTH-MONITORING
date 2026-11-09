@@ -28,7 +28,26 @@
   <meta name="twitter:title" content="PT Akses Kwalitas Unggul | Spesialis Infrastruktur FTTH OSP">
   <meta name="twitter:description" content="Penyedia jasa konstruksi dan infrastruktur jaringan fiber optic (FTTH) terpercaya mitra Telkom Akses & Icon+.">
   <meta name="twitter:image" content="https://akseskwalitasunggul.com/images/logo.png">
+  <!-- Theme Detection Script (Zero FOUC) -->
+  <script>
+    (function() {
+      try {
+        const savedTheme = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class'
+    }
+  </script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
@@ -48,36 +67,80 @@
     .text-brand-red {
       color: #c94c4c;
     }
+
+    /* Scoped Dark Mode Utilities */
+    .dark .bg-white {
+      background-color: #0f172a !important;
+    }
+    .dark .bg-slate-50 {
+      background-color: #020617 !important;
+    }
+    .dark .bg-slate-100 {
+      background-color: #1e293b !important;
+    }
+    .dark .border-slate-100,
+    .dark .border-slate-200 {
+      border-color: #334155 !important;
+    }
+    .dark .text-slate-900 {
+      color: #f8fafc !important;
+    }
+    .dark .text-slate-800 {
+      color: #e2e8f0 !important;
+    }
+    .dark .text-slate-700 {
+      color: #cbd5e1 !important;
+    }
+    .dark .text-slate-600 {
+      color: #94a3b8 !important;
+    }
+    .dark .text-slate-500 {
+      color: #64748b !important;
+    }
   </style>
 </head>
 
-<body class="bg-slate-50 font-sans text-slate-800">
+<body class="bg-slate-50 dark:bg-slate-950 font-sans text-slate-800 dark:text-slate-100 transition-colors duration-200">
 
   <!-- NAVBAR -->
-  <nav class="bg-white shadow-sm sticky top-0 z-50">
+  <nav class="bg-white dark:bg-slate-900 border-b border-transparent dark:border-slate-800 shadow-sm sticky top-0 z-50 transition-colors duration-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex justify-between h-20 items-center">
         <!-- Logo & Brand -->
         <div class="flex items-center gap-3">
           <img src="/images/logo.png" alt="Logo PT AKU" class="h-12 w-auto object-contain">
           <div>
-            <h1 class="font-bold text-xl text-brand-blue tracking-tight leading-none">PT AKSES KWALITAS UNGGUL</h1>
-            <p class="text-xs text-slate-500 font-medium">Infrastruktur Jaringan & Telekomunikasi</p>
+            <h1 class="font-bold text-xl text-brand-blue dark:text-sky-400 tracking-tight leading-none">PT AKSES KWALITAS UNGGUL</h1>
+            <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Infrastruktur Jaringan & Telekomunikasi</p>
           </div>
         </div>
 
-        <!-- Mobile Menu Button -->
-        <button id="mobile-menu-btn" onclick="toggleMobileMenu()" class="md:hidden text-slate-700 hover:text-brand-blue p-2">
-          <i data-lucide="menu" class="w-6 h-6"></i>
-        </button>
+        <!-- Mobile Menu & Theme Button -->
+        <div class="flex items-center gap-2 md:hidden">
+          <button type="button" onclick="toggleIndexTheme()" title="Ubah Tema"
+            class="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
+            aria-label="Toggle Theme">
+            <i data-lucide="sun" class="indexThemeSun w-5 h-5 hidden text-amber-400"></i>
+            <i data-lucide="moon" class="indexThemeMoon w-5 h-5 block text-slate-600 dark:text-slate-300"></i>
+          </button>
+          <button id="mobile-menu-btn" onclick="toggleMobileMenu()" class="text-slate-700 dark:text-slate-200 hover:text-brand-blue p-2">
+            <i data-lucide="menu" class="w-6 h-6"></i>
+          </button>
+        </div>
 
         <!-- Desktop Menu -->
-        <div class="hidden md:flex items-center space-x-8">
-          <a href="#beranda" class="text-sm font-semibold text-slate-600 hover:text-brand-blue">Beranda</a>
-          <a href="#tentang" class="text-sm font-semibold text-slate-600 hover:text-brand-blue">Tentang Kami</a>
-          <a href="#layanan" class="text-sm font-semibold text-slate-600 hover:text-brand-blue">Layanan</a>
-          <a href="#kemitraan" class="text-sm font-semibold text-slate-600 hover:text-brand-blue">Kemitraan</a>
-          <a href="#galeri" class="text-sm font-semibold text-slate-600 hover:text-brand-blue">Galeri</a>
+        <div class="hidden md:flex items-center space-x-6">
+          <a href="#beranda" class="text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-brand-blue dark:hover:text-sky-400">Beranda</a>
+          <a href="#tentang" class="text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-brand-blue dark:hover:text-sky-400">Tentang Kami</a>
+          <a href="#layanan" class="text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-brand-blue dark:hover:text-sky-400">Layanan</a>
+          <a href="#kemitraan" class="text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-brand-blue dark:hover:text-sky-400">Kemitraan</a>
+          <a href="#galeri" class="text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-brand-blue dark:hover:text-sky-400">Galeri</a>
+          <button type="button" onclick="toggleIndexTheme()" title="Ubah Tema Terang / Gelap"
+            class="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 transition cursor-pointer flex items-center justify-center shrink-0"
+            aria-label="Toggle Theme">
+            <i data-lucide="sun" class="indexThemeSun w-4 h-4 hidden text-amber-400"></i>
+            <i data-lucide="moon" class="indexThemeMoon w-4 h-4 block text-slate-600 dark:text-slate-300"></i>
+          </button>
           <a href="/dashboard.html"
             class="bg-brand-blue hover:bg-blue-900 text-white px-5 py-2.5 rounded-lg text-sm font-bold shadow transition flex items-center gap-2">
             <i data-lucide="log-in" class="w-4 h-4"></i> Portal Pegawai
@@ -312,7 +375,7 @@
           </span>
           <h3 class="text-3xl md:text-4xl font-extrabold text-white tracking-tight">Galeri Dokumentasi & Kegiatan</h3>
           <p class="text-slate-400 mt-2 text-sm md:text-base leading-relaxed">
-            Merekam dedikasi, profesionalitas, dan kebersamaan keluarga besar PT Akses Kwalitas Unggul — dari
+            Merekam dedikasi, profesionalitas, dan kebersamaan keluarga besar PT Akses Kwalitas Unggul, mulai dari
             operasional lapangan, pengujian teknis, armada logistik, penerapan K3, hingga koordinasi tim.
           </p>
         </div>
@@ -897,6 +960,38 @@
     // Keyboard ESC to close lightbox
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') closeGalleryModal();
+    });
+
+    // Dark Mode Toggle for Landing Page
+    function toggleIndexTheme() {
+      const isDark = document.documentElement.classList.contains('dark');
+      if (isDark) {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+      } else {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+      }
+      updateIndexThemeIcons();
+    }
+
+    function updateIndexThemeIcons() {
+      const isDark = document.documentElement.classList.contains('dark');
+      const suns = document.querySelectorAll('.indexThemeSun');
+      const moons = document.querySelectorAll('.indexThemeMoon');
+      suns.forEach(sun => {
+        if (isDark) sun.classList.remove('hidden');
+        else sun.classList.add('hidden');
+      });
+      moons.forEach(moon => {
+        if (isDark) moon.classList.add('hidden');
+        else moon.classList.remove('hidden');
+      });
+      if (window.lucide) lucide.createIcons();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      updateIndexThemeIcons();
     });
 
     // Initial load from backend API

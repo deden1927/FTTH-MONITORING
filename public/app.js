@@ -6,6 +6,15 @@ let executorsData = [];
 let revenueChartInstance = null;
 let clientChartInstance = null;
 let currentUser = null;
+let materialsData = [];
+let bonData = [];
+let currentBonId = null;
+let bonItemsDraft = [];
+let canManageBon = false;
+let materialStockChartInstance = null;
+let bonRequestsData = [];
+let materialInboundsData = [];
+let telegramUsersData = [];
 
 // Global Fetch Interceptor for JWT Authentication
 const originalFetch = window.fetch;
@@ -34,6 +43,58 @@ window.fetch = async function(url, options = {}) {
   return response;
 };
 
+// -------------------------------------------------------------
+// THEME MANAGEMENT (DARK MODE)
+// -------------------------------------------------------------
+function isDarkMode() {
+  return document.documentElement.classList.contains('dark');
+}
+
+function applyTheme(isDark) {
+  if (isDark) {
+    document.documentElement.classList.add('dark');
+    localStorage.setItem('theme', 'dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+    localStorage.setItem('theme', 'light');
+  }
+  updateThemeToggleIcons();
+
+  // Re-render active charts to update axis & grid contrast
+  if (typeof loadDashboardStats === 'function') {
+    const dashTab = document.getElementById('content-dashboard');
+    if (dashTab && !dashTab.classList.contains('hidden')) {
+      loadDashboardStats();
+    }
+  }
+  if (typeof renderWarehouseStockChart === 'function') {
+    const matTab = document.getElementById('content-bon-material');
+    if (matTab && !matTab.classList.contains('hidden')) {
+      renderWarehouseStockChart();
+    }
+  }
+}
+
+function toggleTheme() {
+  applyTheme(!isDarkMode());
+}
+
+function updateThemeToggleIcons() {
+  const currentlyDark = isDarkMode();
+  const iconSun = document.getElementById('themeIconSun');
+  const iconMoon = document.getElementById('themeIconMoon');
+  if (iconSun && iconMoon) {
+    if (currentlyDark) {
+      iconSun.classList.remove('hidden');
+      iconMoon.classList.add('hidden');
+    } else {
+      iconSun.classList.add('hidden');
+      iconMoon.classList.remove('hidden');
+    }
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
 // Currency Formatter
 function formatIDR(num) {
   if (isNaN(num) || num === null || num === undefined) return 'Rp 0';
@@ -42,6 +103,7 @@ function formatIDR(num) {
 
 // Initialize on DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
+  updateThemeToggleIcons();
   if (window.lucide) lucide.createIcons();
   checkAuth();
 });
@@ -131,8 +193,12 @@ function showAppBasedOnRole() {
   canManageBon = currentUser && ['superadmin', 'direktur', 'pm'].includes(currentUser.role);
   const btnCreateBon = document.getElementById('btnCreateBon');
   const btnManageMaterials = document.getElementById('btnManageMaterials');
+  const btnInboundMaterial = document.getElementById('btnInboundMaterial');
+  const btnHistoryInbound = document.getElementById('btnHistoryInbound');
   if (btnCreateBon) btnCreateBon.style.display = 'none';
   if (btnManageMaterials) btnManageMaterials.style.display = canManageBon ? 'flex' : 'none';
+  if (btnInboundMaterial) btnInboundMaterial.style.display = canManageBon ? 'flex' : 'none';
+  if (btnHistoryInbound) btnHistoryInbound.style.display = 'flex';
 
   // Reset default
   tabDash.style.display = 'flex';
@@ -175,8 +241,56 @@ function showAppBasedOnRole() {
     switchTab('dashboard');
   }
 
+  updateNavGroupVisibility();
   loadAllData();
 }
+
+// -------------------------------------------------------------
+// SIDEBAR & NAVIGATION HELPERS
+// -------------------------------------------------------------
+function updateNavGroupVisibility() {
+  const groups = ['overview', 'operasional', 'finansial', 'pengaturan'];
+  groups.forEach(g => {
+    const el = document.getElementById(`nav-group-${g}`);
+    if (!el) return;
+    const tabs = Array.from(el.querySelectorAll('.nav-tab'));
+    const anyVisible = tabs.some(t => t.style.display !== 'none');
+    el.style.display = anyVisible ? 'block' : 'none';
+  });
+}
+
+function toggleSidebar(open) {
+  const sidebar = document.getElementById('app-sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  if (!sidebar) return;
+  const shouldOpen = open !== undefined ? open : sidebar.classList.contains('-translate-x-full');
+  if (shouldOpen) {
+    sidebar.classList.remove('-translate-x-full');
+    if (backdrop) backdrop.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden', 'lg:overflow-auto');
+  } else {
+    sidebar.classList.add('-translate-x-full');
+    if (backdrop) backdrop.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden', 'lg:overflow-auto');
+  }
+}
+
+function handleNavClick(tabName) {
+  switchTab(tabName);
+  if (window.innerWidth < 1024) {
+    toggleSidebar(false);
+  }
+}
+
+// Close mobile sidebar on Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const sidebar = document.getElementById('app-sidebar');
+    if (sidebar && !sidebar.classList.contains('-translate-x-full')) {
+      toggleSidebar(false);
+    }
+  }
+});
 
 // Load All Data
 async function loadAllData() {
@@ -203,17 +317,33 @@ function switchTab(tabName) {
   currentTab = tabName;
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
   document.querySelectorAll('.nav-tab').forEach(btn => {
-    btn.classList.remove('text-sky-400', 'bg-slate-900', 'border', 'border-slate-700');
-    btn.classList.add('text-slate-400');
+    btn.classList.remove('text-sky-400', 'bg-slate-800', 'border', 'border-slate-700/80', 'font-semibold');
+    btn.classList.add('text-slate-400', 'hover:text-white', 'hover:bg-slate-800/60');
   });
 
   const activeContent = document.getElementById(`content-${tabName}`);
   const activeBtn = document.getElementById(`tab-${tabName}`);
   if (activeContent) activeContent.classList.remove('hidden');
   if (activeBtn) {
-    activeBtn.classList.remove('text-slate-400');
-    activeBtn.classList.add('text-sky-400', 'bg-slate-900', 'border', 'border-slate-700');
+    activeBtn.classList.remove('text-slate-400', 'hover:text-white', 'hover:bg-slate-800/60');
+    activeBtn.classList.add('text-sky-400', 'bg-slate-800', 'border', 'border-slate-700/80', 'font-semibold');
   }
+
+  // Update Topbar Title & Subtitle Contextually
+  const titles = {
+    'dashboard': { title: 'Executive Dashboard', subtitle: 'Ringkasan performa pendapatan dan progres operasional FTTH' },
+    'projects': { title: 'Manajemen WO & Lapangan', subtitle: 'Monitoring berkala progres fisik, penugasan mandor, dan kendala lapangan' },
+    'bon-material': { title: 'Bon Material per Work Order', subtitle: 'Pengelolaan dan pemantauan material terencana, terpakai, dan sisa per WO' },
+    'finance': { title: 'Cashflow 2 Arah (Klien & Mandor)', subtitle: 'Kelola tagihan invoice ke klien dan termin pembayaran eksekutor lapangan' },
+    'executors': { title: 'Master Eksekutor', subtitle: 'Daftar mandor dan mitra rekanan, armada, beban kerja, dan performa' },
+    'users': { title: 'Manajemen User (Admin)', subtitle: 'Pengelolaan akun pengguna, hak akses role sistem, dan kredensial' },
+    'gallery-mgmt': { title: 'Kelola Galeri Index', subtitle: 'Manajemen dokumentasi foto aktivitas lapangan untuk halaman utama' }
+  };
+  const t = titles[tabName] || { title: 'Dashboard Monitoring', subtitle: 'PT Akses Kwalitas Unggul' };
+  const pageTitleEl = document.getElementById('topbarPageTitle');
+  const pageSubEl = document.getElementById('topbarPageSubtitle');
+  if (pageTitleEl) pageTitleEl.textContent = t.title;
+  if (pageSubEl) pageSubEl.textContent = t.subtitle;
 
   if (tabName === 'dashboard') {
     loadDashboardStats();
@@ -293,6 +423,10 @@ function renderRevenueChart(monthlyData) {
     revenueChartInstance.destroy();
   }
 
+  const isDark = isDarkMode();
+  const textColor = isDark ? '#cbd5e1' : '#64748b';
+  const gridColor = isDark ? 'rgba(51, 65, 85, 0.45)' : 'rgba(226, 232, 240, 0.8)';
+
   revenueChartInstance = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -316,17 +450,27 @@ function renderRevenueChart(monthlyData) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+        legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 }, color: textColor } },
         tooltip: {
+          backgroundColor: isDark ? '#0f172a' : '#ffffff',
+          titleColor: isDark ? '#f8fafc' : '#0f172a',
+          bodyColor: isDark ? '#cbd5e1' : '#334155',
+          borderColor: isDark ? '#334155' : '#e2e8f0',
+          borderWidth: 1,
           callbacks: {
-            label: (ctx) => `${ctx.dataset.label}: Rp ${ctx.parsed.y.toLocaleString('id-ID')} Juta`
+            label: (ctx) => `${ctx.dataset.label}: Rp ${Number(ctx.parsed.y).toLocaleString('id-ID', { maximumFractionDigits: 2 })} Juta`
           }
         }
       },
       scales: {
+        x: {
+          ticks: { color: textColor },
+          grid: { color: gridColor }
+        },
         y: {
           beginAtZero: true,
-          ticks: { callback: (v) => 'Rp ' + v + 'M' }
+          ticks: { color: textColor, callback: (v) => 'Rp ' + v + ' Jt' },
+          grid: { color: gridColor }
         }
       }
     }
@@ -346,6 +490,7 @@ function renderClientChart(clientPortfolio) {
   }
 
   const colors = ['#0284c7', '#10b981', '#f59e0b', '#8b5cf6'];
+  const isDark = isDarkMode();
 
   clientChartInstance = new Chart(ctx, {
     type: 'doughnut',
@@ -355,7 +500,7 @@ function renderClientChart(clientPortfolio) {
         data: values,
         backgroundColor: colors.slice(0, labels.length),
         borderWidth: 2,
-        borderColor: '#ffffff'
+        borderColor: isDark ? '#0f172a' : '#ffffff'
       }]
     },
     options: {
@@ -378,9 +523,9 @@ function renderClientChart(clientPortfolio) {
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-1.5">
             <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${colors[idx]}"></span>
-            <span class="font-medium text-slate-700">${lbl}</span>
+            <span class="font-medium text-slate-700 dark:text-slate-200">${lbl}</span>
           </div>
-          <span class="text-slate-500 font-semibold">${formatIDR(val)} (${pct}%)</span>
+          <span class="text-slate-500 dark:text-slate-400 font-semibold">${formatIDR(val)} (${pct}%)</span>
         </div>
       `;
     }).join('');
@@ -504,79 +649,158 @@ function renderProjectsList() {
 
   if (projectsData.length === 0) {
     container.innerHTML = `
-      <div class="bg-white p-12 text-center rounded-2xl border border-slate-200">
-        <i data-lucide="folder-search" class="w-12 h-12 text-slate-300 mx-auto mb-3"></i>
-        <h4 class="font-bold text-slate-700">Tidak ada proyek yang sesuai filter</h4>
-        <p class="text-xs text-slate-400 mt-1">Coba ubah filter atau tambah Work Order baru.</p>
+      <div class="bg-white dark:bg-slate-900 p-12 text-center rounded-2xl border border-slate-200 dark:border-slate-800">
+        <i data-lucide="folder-search" class="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3"></i>
+        <h4 class="font-bold text-slate-700 dark:text-slate-200">Tidak ada proyek yang sesuai filter</h4>
+        <p class="text-xs text-slate-400 dark:text-slate-500 mt-1">Coba ubah filter atau tambah Work Order baru.</p>
       </div>
     `;
     if (window.lucide) lucide.createIcons();
     return;
   }
 
-  container.innerHTML = projectsData.map(proj => {
-    // Client Color Badge
-    let clientColor = 'bg-sky-100 text-sky-800 border-sky-300';
-    if (proj.client_name.includes('Icon')) clientColor = 'bg-emerald-100 text-emerald-800 border-emerald-300';
-    if (proj.client_name.includes('ID Net')) clientColor = 'bg-purple-100 text-purple-800 border-purple-300';
+  // Kelompokkan pekerjaan berdasarkan Nomor SP/PO
+  const spGroups = [];
+  const spMap = new Map();
 
-    // Executor Badge
-    const isInternal = proj.executor_type === 'Internal';
-    const execBadge = isInternal
-      ? `<span class="inline-flex items-center gap-1 bg-sky-50 text-sky-700 border border-sky-200 px-2 py-0.5 rounded text-[11px] font-semibold"><i data-lucide="shield" class="w-3 h-3"></i> Internal: ${proj.executor_name}</span>`
-      : `<span class="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded text-[11px] font-semibold"><i data-lucide="hard-hat" class="w-3 h-3"></i> Mandor: ${proj.executor_name}</span>`;
+  projectsData.forEach(proj => {
+    const spKey = proj.sp_number || proj.wo_number || 'SP-UNKNOWN';
+    if (!spMap.has(spKey)) {
+      const g = {
+        sp_number: spKey,
+        client_name: proj.client_name,
+        created_at: proj.created_at,
+        jobs: []
+      };
+      spMap.set(spKey, g);
+      spGroups.push(g);
+    }
+    spMap.get(spKey).jobs.push(proj);
+  });
+
+  container.innerHTML = spGroups.map(group => {
+    // Client Color Badge
+    let clientColor = 'bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800';
+    if (group.client_name.includes('Icon')) clientColor = 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800';
+    if (group.client_name.includes('ID Net')) clientColor = 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800';
+
+    const totalBOQ = group.jobs.reduce((a, b) => a + (Number(b.contract_value) || 0), 0);
+    const totalHPP = group.jobs.reduce((a, b) => a + (Number(b.mandor_cost) || 0), 0);
+    const totalMargin = totalBOQ - totalHPP;
+    const marginPct = totalBOQ > 0 ? Number(((totalMargin / totalBOQ) * 100).toFixed(1)) : 0;
+    const avgProgress = Math.round(group.jobs.reduce((a, b) => a + (Number(b.progress_percent) || 0), 0) / group.jobs.length);
 
     return `
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition hover:shadow-md">
-        <!-- Project Header -->
-        <div class="p-5 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50/50">
-          <div>
-            <div class="flex flex-wrap items-center gap-2 mb-1.5">
-              <span class="px-2.5 py-0.5 text-xs font-bold rounded-full border ${clientColor}">${proj.client_name}</span>
-              <span class="font-mono font-bold text-slate-900 text-sm">${proj.wo_number}</span>
-              ${execBadge}
+      <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden transition space-y-0">
+        <!-- SP/PO Induk Header -->
+        <div class="p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/60 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div class="space-y-1.5">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="px-2.5 py-0.5 text-xs font-bold rounded-full border ${clientColor}">${group.client_name}</span>
+              <span class="font-mono font-bold text-slate-900 dark:text-slate-100 text-base">SP/PO: ${group.sp_number}</span>
+              <span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
+                ${group.jobs.length} Pekerjaan Lapangan
+              </span>
             </div>
-            <h3 class="font-bold text-slate-900 text-base flex items-center gap-1.5">
-              <i data-lucide="map-pin" class="w-4 h-4 text-slate-400"></i> ${proj.cluster_name}
-            </h3>
-            <p class="text-xs text-slate-500 mt-0.5">Target Selesai: <span class="font-semibold text-slate-700">${proj.target_date}</span></p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              Akumulasi progres fisik SP: <b class="text-slate-800 dark:text-slate-200">${avgProgress}%</b> • Terbit: <span class="text-slate-700 dark:text-slate-300 font-medium">${group.created_at || '-'}</span>
+            </p>
           </div>
 
-          <!-- Financial Snapshot per WO -->
-          <div class="flex items-center gap-3">
-            <div class="text-right bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
-              <span class="text-[10px] text-slate-400 font-semibold block uppercase">Nilai Kontrak SPK</span>
-              <span class="text-sm font-bold text-slate-900">${formatIDR(proj.contract_value)}</span>
-              <div class="text-[11px] text-indigo-600 font-semibold mt-0.5">
-                Laba Kotor: ${formatIDR(proj.gross_margin)} (${proj.margin_percent}%)
+          <!-- Total Finansial SP & Aksi Tambah Pekerjaan -->
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="text-right bg-white dark:bg-slate-800 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs">
+              <span class="text-[10px] text-slate-400 dark:text-slate-400 font-semibold block uppercase">Total Nilai BOQ SP</span>
+              <span class="text-sm font-bold text-slate-900 dark:text-slate-100">${formatIDR(totalBOQ)}</span>
+              <div class="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold mt-0.5">
+                Laba Bersih: ${formatIDR(totalMargin)} (${marginPct}%)
               </div>
             </div>
-            <button onclick="deleteProject('${proj.id}', '${proj.wo_number}')" title="Hapus Work Order" class="bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 text-xs font-semibold px-2.5 py-2.5 rounded-lg border border-red-200 transition flex items-center gap-1">
-              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+
+            <button type="button" onclick="openAddJobForSp('${escapeQuote(group.sp_number)}', '${escapeQuote(group.client_name)}')" class="bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold px-3.5 py-2.5 rounded-lg flex items-center gap-1.5 shadow-xs transition cursor-pointer">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i> + Tambah Pekerjaan
             </button>
           </div>
         </div>
 
-        <!-- Progress Bar Summary -->
-        <div class="px-5 py-2.5 bg-slate-100/60 border-b border-slate-100 flex items-center justify-between text-xs">
-          <span class="font-semibold text-slate-600">Progres Fisik Keseluruhan:</span>
-          <div class="flex items-center gap-3 w-1/2">
-            <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
-              <div class="bg-emerald-500 h-2.5 rounded-full transition-all" style="width: ${proj.progress_percent || 0}%"></div>
-            </div>
-            <span class="font-bold text-slate-800 w-10 text-right">${proj.progress_percent || 0}%</span>
-          </div>
-        </div>
+        <!-- Daftar Pekerjaan / Work Orders di bawah SP ini -->
+        <div class="p-5 space-y-5 divide-y divide-slate-100 dark:divide-slate-800">
+          ${group.jobs.map((proj, idx) => {
+            const isInternal = proj.executor_type === 'Internal';
+            const execBadge = isInternal
+              ? `<span class="inline-flex items-center gap-1 bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 px-2 py-0.5 rounded text-[11px] font-semibold"><i data-lucide="shield" class="w-3 h-3"></i> Internal: ${proj.executor_name}</span>`
+              : `<span class="inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded text-[11px] font-semibold"><i data-lucide="hard-hat" class="w-3 h-3"></i> Mandor: ${proj.executor_name}</span>`;
 
-        <!-- 4 Milestone Cards Grid (Tiang, KU Fiber, ODP, ATP) -->
-        <div class="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          ${proj.milestones.map(m => renderMilestoneCard(m, proj)).join('')}
+            return `
+              <div id="project-card-${proj.id}" class="${idx > 0 ? 'pt-5' : ''} space-y-3.5">
+                <!-- Header Pekerjaan -->
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white dark:bg-slate-800/90 p-3.5 rounded-xl border border-slate-200/90 dark:border-slate-700/80 shadow-2xs">
+                  <div>
+                    <div class="flex flex-wrap items-center gap-2 mb-1">
+                      <span class="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-1.5">
+                        <i data-lucide="map-pin" class="w-4 h-4 text-sky-600 dark:text-sky-400"></i>
+                        <span>${proj.job_name || proj.cluster_name}</span>
+                      </span>
+                      ${execBadge}
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                      Nilai BOQ: <b class="text-slate-800 dark:text-slate-200">${formatIDR(proj.contract_value)}</b> • HPP Mandor: <b class="text-slate-800 dark:text-slate-200">${formatIDR(proj.mandor_cost)}</b> • Target Selesai: <span class="font-semibold text-slate-700 dark:text-slate-300">${proj.target_date || '-'}</span>
+                    </p>
+                  </div>
+
+                  <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-2 w-36">
+                      <div class="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                        <div class="bg-emerald-500 h-2 rounded-full transition-all" style="width: ${proj.progress_percent || 0}%"></div>
+                      </div>
+                      <span class="text-xs font-bold text-slate-800 dark:text-slate-200 w-8 text-right">${proj.progress_percent || 0}%</span>
+                    </div>
+
+                    <button type="button" onclick="deleteProject('${proj.id}', '${escapeQuote(proj.job_name || proj.cluster_name)}')" title="Hapus Pekerjaan Ini" class="bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/60 text-red-600 dark:text-red-400 text-xs font-semibold p-2 rounded-lg border border-red-200 dark:border-red-900 transition flex items-center cursor-pointer">
+                      <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 4 Milestone Cards Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  ${proj.milestones.map(m => renderMilestoneCard(m, proj)).join('')}
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
       </div>
     `;
   }).join('');
 
   if (window.lucide) lucide.createIcons();
+}
+
+function openAddJobForSp(spNumber, clientName) {
+  openModal('modalAddProject');
+  const spSelect = document.getElementById('modal-sp-select');
+  const clientSelect = document.getElementById('modal-client');
+  const containerCustom = document.getElementById('container-custom-sp');
+  const inputWo = document.getElementById('modal-wo');
+
+  if (spSelect) {
+    spSelect.value = spNumber;
+    handleSpSelectChange(spNumber);
+  }
+  if (clientSelect && clientName) {
+    clientSelect.value = clientName;
+  }
+  if (containerCustom) containerCustom.classList.add('hidden');
+  if (inputWo) {
+    inputWo.value = spNumber;
+    inputWo.required = false;
+  }
+  const clusterInput = document.getElementById('modal-cluster');
+  if (clusterInput) {
+    clusterInput.value = '';
+    clusterInput.focus();
+  }
 }
 
 async function deleteProject(projId, woNumber) {
@@ -613,7 +837,7 @@ function renderMilestoneCard(m, proj) {
   let extraContent = '';
   if (m.stage_name === 'Testing & ATP' && (m.otdr_loss || m.opm_power)) {
     extraContent = `
-      <div class="mt-2 pt-2 border-t border-slate-100 text-[11px] text-slate-600 space-y-0.5 bg-slate-50 p-1.5 rounded">
+      <div class="mt-2 pt-2 border-t border-slate-100 dark:border-slate-700 text-[11px] text-slate-600 dark:text-slate-300 space-y-0.5 bg-slate-50 dark:bg-slate-900/60 p-1.5 rounded">
         <div><b>OTDR:</b> ${m.otdr_loss || '-'}</div>
         <div><b>OPM:</b> ${m.opm_power || '-'}</div>
       </div>
@@ -624,30 +848,30 @@ function renderMilestoneCard(m, proj) {
   let blockedAlert = '';
   if (m.status === 'Blocked' && m.blocked_reason) {
     blockedAlert = `
-      <div class="mt-2 p-1.5 bg-red-50 text-red-700 text-[10px] rounded border border-red-200 font-medium">
+      <div class="mt-2 p-1.5 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-[10px] rounded border border-red-200 dark:border-red-900 font-medium">
         ⚠️ <b>Kendala:</b> ${m.blocked_reason}
       </div>
     `;
   }
 
   return `
-    <div class="bg-white p-3.5 rounded-xl border border-slate-200 flex flex-col justify-between hover:border-sky-300 transition">
+    <div class="bg-white dark:bg-slate-850 dark:bg-slate-800/90 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/80 flex flex-col justify-between hover:border-sky-300 dark:hover:border-sky-500 transition">
       <div>
         <div class="flex items-center justify-between mb-2">
-          <span class="text-xs font-bold text-slate-800">${m.stage_name}</span>
+          <span class="text-xs font-bold text-slate-800 dark:text-slate-100">${m.stage_name}</span>
           <span class="px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ${statusBadgeClass}">
             <i data-lucide="${statusIcon}" class="w-3 h-3"></i> ${m.status}
           </span>
         </div>
 
-        <p class="text-[11px] text-slate-500 line-clamp-2">${m.notes || 'Belum ada catatan.'}</p>
+        <p class="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2">${m.notes || 'Belum ada catatan.'}</p>
         ${blockedAlert}
         ${extraContent}
       </div>
 
-      <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
-        <span class="text-[11px] font-semibold text-slate-500">${m.progress_percent}%</span>
-        <button onclick="openUpdateMilestoneModal('${m.id}')" class="text-xs font-semibold text-sky-600 hover:text-sky-700 flex items-center gap-1">
+      <div class="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-700/80 flex items-center justify-between">
+        <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">${m.progress_percent}%</span>
+        <button onclick="openUpdateMilestoneModal('${m.id}')" class="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 flex items-center gap-1 cursor-pointer">
           <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Update
         </button>
       </div>
@@ -663,6 +887,9 @@ function escapeQuote(str) {
 // -------------------------------------------------------------
 // 4. FINANCE (CASHFLOW 2 ARAH)
 // -------------------------------------------------------------
+let invoicesData = [];
+let mandorPayoutsData = [];
+
 async function loadInvoices() {
   const tbody = document.getElementById('invoices-table-body');
   if (!tbody) return;
@@ -670,33 +897,48 @@ async function loadInvoices() {
   try {
     const res = await fetch('/api/invoices');
     const list = await res.json();
+    invoicesData = Array.isArray(list) ? list : [];
 
-    tbody.innerHTML = list.map(inv => {
-      const isLunas = inv.status === 'Lunas';
-      let statusBadge = 'bg-slate-100 text-slate-700';
-      if (inv.status === 'BAST Terbit') statusBadge = 'bg-sky-100 text-sky-800';
-      if (inv.status === 'Invoice Terkirim') statusBadge = 'bg-amber-100 text-amber-800';
-      if (isLunas) statusBadge = 'bg-emerald-100 text-emerald-800 font-bold';
+    tbody.innerHTML = invoicesData.map(inv => {
+      const isLunas = inv.status === 'Sudah Cashbank' || inv.status === 'Lunas';
+      let statusBadge = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+      if (inv.status === 'BAST Terbit') statusBadge = 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300';
+      if (inv.status === 'Belum Cashbank' || inv.status === 'Invoice Terkirim') statusBadge = 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300';
+      if (isLunas) statusBadge = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold';
+
+      const canManage = currentUser && ['superadmin', 'finance', 'direktur'].includes(currentUser.role);
+      const displayStatus = (inv.status === 'Invoice Terkirim' || !inv.status || inv.status === 'Belum Cashbank')
+        ? 'Belum Cashbank'
+        : (isLunas ? 'Sudah Cashbank' : inv.status);
 
       return `
-        <tr class="hover:bg-slate-50">
-          <td class="p-3 font-mono font-bold text-slate-900">${inv.id}</td>
-          <td class="p-3 font-semibold">${inv.client_name}</td>
-          <td class="p-3 text-slate-600 font-mono">${inv.wo_number}</td>
-          <td class="p-3">${inv.term_name}</td>
-          <td class="p-3 text-right font-bold text-slate-900">${formatIDR(inv.amount)}</td>
-          <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] ${statusBadge}">${inv.status}</span></td>
-          <td class="p-3 text-slate-600">${inv.invoice_date}</td>
-          <td class="p-3 text-slate-600">${inv.due_date}</td>
-          <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 font-medium">${inv.aging_category}</span></td>
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+          <td class="p-3 font-mono font-bold text-slate-900 dark:text-slate-100">${inv.id}</td>
+          <td class="p-3 font-semibold text-slate-800 dark:text-slate-200">${inv.client_name}</td>
+          <td class="p-3 text-slate-600 dark:text-slate-400 font-mono">${inv.wo_number}</td>
+          <td class="p-3 text-slate-700 dark:text-slate-300">${inv.term_name}</td>
+          <td class="p-3 text-right font-bold text-slate-900 dark:text-slate-100">${formatIDR(inv.amount)}</td>
+          <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-semibold ${statusBadge}">${displayStatus}</span></td>
+          <td class="p-3 text-slate-600 dark:text-slate-400">${inv.invoice_date}</td>
+          <td class="p-3 text-slate-600 dark:text-slate-400">${inv.due_date}</td>
+          <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">${inv.aging_category}</span></td>
           <td class="p-3 text-center">
-            ${!isLunas ? (
-              (currentUser && ['superadmin', 'finance'].includes(currentUser.role)) ? `
-                <button onclick="markInvoicePaid('${inv.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-[11px] font-semibold shadow-xs">
-                  Tandai Lunas
+            <div class="flex items-center justify-center gap-1.5">
+              ${!isLunas && canManage ? `
+                <button type="button" onclick="markInvoicePaid('${inv.id}')" title="Tandai Lunas (Sudah Cashbank)" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[11px] font-semibold shadow-2xs transition cursor-pointer">
+                  Lunas
                 </button>
-              ` : `<span class="text-slate-400 text-[11px] font-medium">Belum Lunas</span>`
-            ) : `<span class="text-emerald-600 font-bold text-[11px] flex items-center justify-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5"></i> Masuk Kas</span>`}
+              ` : ''}
+              ${isLunas ? `<span class="text-emerald-700 dark:text-emerald-400 font-bold text-[11px] bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-1.5 py-0.5 rounded">Sudah Cashbank</span>` : ''}
+              ${canManage ? `
+                <button type="button" onclick="openEditInvoiceModal('${inv.id}')" title="Edit Tagihan" class="p-1.5 text-slate-600 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 transition cursor-pointer">
+                  <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                </button>
+                <button type="button" onclick="deleteInvoice('${inv.id}', '${escapeQuote(inv.wo_number)}', ${inv.amount})" title="Hapus Tagihan" class="p-1.5 text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg border border-slate-200 dark:border-slate-700 transition cursor-pointer">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              ` : ''}
+            </div>
           </td>
         </tr>
       `;
@@ -707,13 +949,116 @@ async function loadInvoices() {
   }
 }
 
-async function markInvoicePaid(invId) {
-  if (!confirm('Konfirmasi bahwa pembayaran invoice ini sudah masuk ke rekening perusahaan?')) return;
+function openEditInvoiceModal(invId) {
+  const inv = (invoicesData || []).find(i => i.id === invId);
+  if (!inv) return;
+
+  document.getElementById('edit-inv-id').value = inv.id;
+  const displayIdEl = document.getElementById('edit-display-inv-id');
+  if (displayIdEl) displayIdEl.value = inv.id;
+  document.getElementById('edit-inv-wo').value = inv.wo_number || '';
+  document.getElementById('edit-inv-client').value = inv.client_name || '';
+  document.getElementById('edit-inv-term').value = inv.term_name || '';
+  document.getElementById('edit-inv-amount').value = inv.amount || 0;
+  document.getElementById('edit-inv-status').value = inv.status || 'Draft';
+  document.getElementById('edit-inv-date').value = inv.invoice_date || '';
+  document.getElementById('edit-inv-due').value = inv.due_date || '';
+  document.getElementById('edit-inv-paid-date').value = inv.paid_date || '';
+
+  toggleEditInvoicePaidDate();
+  openModal('modalEditInvoice');
+}
+
+function updateEditInvoiceDueDate() {
+  const invDate = document.getElementById('edit-inv-date').value;
+  if (!invDate) return;
+  const d = new Date(invDate);
+  d.setMonth(d.getMonth() + 2);
+  document.getElementById('edit-inv-due').value = d.toISOString().split('T')[0];
+}
+
+function toggleEditInvoicePaidDate() {
+  const status = document.getElementById('edit-inv-status').value;
+  const container = document.getElementById('container-edit-inv-paid');
+  const paidInput = document.getElementById('edit-inv-paid-date');
+  if (status === 'Sudah Cashbank' || status === 'Lunas') {
+    container.classList.remove('hidden');
+    if (!paidInput.value) paidInput.value = new Date().toISOString().split('T')[0];
+  } else {
+    container.classList.add('hidden');
+  }
+}
+
+async function submitEditInvoice(e) {
+  e.preventDefault();
+  const id = document.getElementById('edit-inv-id').value;
+  const wo_number = document.getElementById('edit-inv-wo').value.trim();
+  const client_name = document.getElementById('edit-inv-client').value.trim();
+  const term_name = document.getElementById('edit-inv-term').value.trim();
+  const amount = Number(document.getElementById('edit-inv-amount').value) || 0;
+  const status = document.getElementById('edit-inv-status').value;
+  const invoice_date = document.getElementById('edit-inv-date').value;
+  const due_date = document.getElementById('edit-inv-due').value;
+  const isPaid = status === 'Sudah Cashbank' || status === 'Lunas';
+  const paid_date = isPaid ? (document.getElementById('edit-inv-paid-date').value || new Date().toISOString().split('T')[0]) : '';
+
   try {
-    const res = await fetch(`/api/invoices/${invId}/status`, {
+    const res = await fetch(`/api/invoices/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'Lunas' })
+      body: JSON.stringify({
+        wo_number,
+        client_name,
+        term_name,
+        amount,
+        status,
+        invoice_date,
+        due_date,
+        paid_date
+      })
+    });
+    if (res.ok) {
+      closeModal('modalEditInvoice');
+      loadInvoices();
+      loadDashboardStats();
+    } else {
+      const err = await res.json();
+      alert(err.message || 'Gagal menyimpan perubahan invoice.');
+    }
+  } catch (err) {
+    console.error('Error updating invoice:', err);
+    alert('Terjadi kesalahan saat memperbarui invoice.');
+  }
+}
+
+async function deleteInvoice(invId, woNumber, amount) {
+  if (!confirm(`Apakah Anda yakin ingin menghapus tagihan ${woNumber} senilai ${formatIDR(amount)}?\n\nData yang dihapus tidak dapat dipulihkan.`)) {
+    return;
+  }
+  try {
+    const res = await fetch(`/api/invoices/${encodeURIComponent(invId)}`, {
+      method: 'DELETE'
+    });
+    if (res.ok) {
+      loadInvoices();
+      loadDashboardStats();
+    } else {
+      const err = await res.json();
+      alert(err.message || 'Gagal menghapus invoice.');
+    }
+  } catch (err) {
+    console.error('Error deleting invoice:', err);
+    alert('Terjadi kesalahan saat menghapus invoice.');
+  }
+}
+
+async function markInvoicePaid(invId) {
+  if (!confirm('Konfirmasi bahwa pembayaran invoice ini sudah masuk ke rekening perusahaan (Sudah Cashbank)?')) return;
+  try {
+    const res = await fetch(`/api/invoices/${encodeURIComponent(invId)}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'Sudah Cashbank' })
     });
     if (res.ok) {
       loadInvoices();
@@ -731,41 +1076,53 @@ async function loadMandorPayouts() {
   try {
     const res = await fetch('/api/mandor-payouts');
     const payouts = await res.json();
+    mandorPayoutsData = Array.isArray(payouts) ? payouts : [];
 
-    tbody.innerHTML = payouts.map(p => {
+    tbody.innerHTML = mandorPayoutsData.map(p => {
       const isPaid = p.status === 'Lunas';
       const isApproved = p.verified_by_pm;
+      const canManage = currentUser && ['superadmin', 'finance', 'pm', 'direktur'].includes(currentUser.role);
 
       return `
-        <tr class="hover:bg-slate-50">
-          <td class="p-3 font-mono font-bold">${p.id}</td>
-          <td class="p-3 font-bold text-slate-900">${p.mandor_name}</td>
-          <td class="p-3 font-mono text-slate-600">${p.project_id}</td>
-          <td class="p-3">${p.milestone_stage}</td>
-          <td class="p-3 text-right font-bold text-amber-900">${formatIDR(p.amount)}</td>
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+          <td class="p-3 font-mono font-bold text-slate-900 dark:text-slate-100">${p.id}</td>
+          <td class="p-3 font-bold text-slate-900 dark:text-slate-100">${p.mandor_name}</td>
+          <td class="p-3 font-mono text-slate-600 dark:text-slate-400">${p.project_id}</td>
+          <td class="p-3 text-slate-700 dark:text-slate-300">${p.milestone_stage}</td>
+          <td class="p-3 text-right font-bold text-amber-900 dark:text-amber-300">${formatIDR(p.amount)}</td>
           <td class="p-3">
-            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isApproved ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isApproved ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'}">
               ${isApproved ? '✔ Terverifikasi PM' : '✖ Belum Lolos PM'}
             </span>
           </td>
           <td class="p-3">
-            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isPaid ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isPaid ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'}">
               ${p.status}
             </span>
           </td>
-          <td class="p-3 text-[11px] text-slate-500">${p.notes || '-'}</td>
-          <td class="p-3 text-center space-x-1">
-            ${!isApproved && !isPaid ? `
-              <button onclick="verifyMandorPayout('${p.id}', true)" class="bg-sky-600 hover:bg-sky-500 text-white px-2 py-1 rounded text-[10px] font-semibold">
-                Setujui PM
-              </button>
-            ` : ''}
-            ${isApproved && !isPaid ? `
-              <button onclick="payMandorPayout('${p.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-[10px] font-bold shadow-xs">
-                Cairkan Kas
-              </button>
-            ` : ''}
-            ${isPaid ? `<span class="text-slate-400 font-semibold text-[10px]">Tuntas</span>` : ''}
+          <td class="p-3 text-[11px] text-slate-500 dark:text-slate-400">${p.notes || '-'}</td>
+          <td class="p-3 text-center">
+            <div class="flex items-center justify-center gap-1.5">
+              ${!isApproved && !isPaid && ['pm', 'superadmin', 'direktur'].includes(currentUser?.role) ? `
+                <button type="button" onclick="verifyMandorPayout('${p.id}', true)" class="bg-sky-600 hover:bg-sky-500 text-white px-2 py-1 rounded text-[10px] font-semibold cursor-pointer">
+                  Setujui PM
+                </button>
+              ` : ''}
+              ${isApproved && !isPaid && ['finance', 'superadmin', 'direktur'].includes(currentUser?.role) ? `
+                <button type="button" onclick="payMandorPayout('${p.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-[10px] font-bold shadow-2xs cursor-pointer">
+                  Cairkan Kas
+                </button>
+              ` : ''}
+              ${isPaid ? `<span class="text-slate-400 dark:text-slate-500 font-semibold text-[10px]">Tuntas</span>` : ''}
+              ${canManage ? `
+                <button type="button" onclick="openEditMandorPayoutModal('${p.id}')" title="Edit Kas Keluar" class="p-1.5 text-slate-600 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 transition cursor-pointer">
+                  <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                </button>
+                <button type="button" onclick="deleteMandorPayout('${p.id}', '${escapeQuote(p.mandor_name)}', ${p.amount})" title="Hapus Kas Keluar" class="p-1.5 text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg border border-slate-200 dark:border-slate-700 transition cursor-pointer">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              ` : ''}
+            </div>
           </td>
         </tr>
       `;
@@ -773,6 +1130,124 @@ async function loadMandorPayouts() {
     if (window.lucide) lucide.createIcons();
   } catch (err) {
     console.error('Error loading payouts:', err);
+  }
+}
+
+function populateMandorPayoutProjectOptions() {
+  const select = document.getElementById('add-pay-project');
+  if (!select) return;
+
+  let html = '<option value="Operasional Umum">-- Umum / Operasional Lapangan (Non-WO) --</option>';
+  (projectsData || []).forEach(p => {
+    const sp = p.sp_number || p.wo_number;
+    const job = p.job_name || p.cluster_name;
+    html += `<option value="${escapeQuote(sp)} - ${escapeQuote(job)}">${sp} - ${job} (${p.client_name})</option>`;
+  });
+  select.innerHTML = html;
+}
+
+function openEditMandorPayoutModal(payoutId) {
+  const p = (mandorPayoutsData || []).find(item => item.id === payoutId);
+  if (!p) return;
+
+  document.getElementById('edit-pay-id').value = p.id;
+  document.getElementById('edit-pay-mandor').value = p.mandor_name || '';
+  document.getElementById('edit-pay-stage').value = p.milestone_stage || '';
+  document.getElementById('edit-pay-amount').value = p.amount || 0;
+  document.getElementById('edit-pay-status').value = p.status || 'Pending Verifikasi';
+  document.getElementById('edit-pay-notes').value = p.notes || '';
+
+  openModal('modalEditMandorPayout');
+}
+
+async function submitNewMandorPayout(e) {
+  e.preventDefault();
+  const project_id = document.getElementById('add-pay-project')?.value || 'manual';
+  const mandor_name = document.getElementById('add-pay-mandor').value.trim();
+  const milestone_stage = document.getElementById('add-pay-stage').value;
+  const amount = Number(document.getElementById('add-pay-amount').value) || 0;
+  const notes = document.getElementById('add-pay-notes').value.trim();
+
+  try {
+    const res = await fetch('/api/mandor-payouts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project_id,
+        mandor_name,
+        milestone_stage,
+        amount,
+        notes
+      })
+    });
+    if (res.ok) {
+      closeModal('modalAddMandorPayout');
+      document.getElementById('formAddMandorPayout').reset();
+      loadMandorPayouts();
+      loadDashboardStats();
+    } else {
+      const err = await res.json();
+      alert(err.message || 'Gagal mencatat kas keluar.');
+    }
+  } catch (err) {
+    console.error('Error creating payout:', err);
+    alert('Terjadi kesalahan saat mencatat kas keluar.');
+  }
+}
+
+async function submitEditMandorPayout(e) {
+  e.preventDefault();
+  const id = document.getElementById('edit-pay-id').value;
+  const mandor_name = document.getElementById('edit-pay-mandor').value.trim();
+  const milestone_stage = document.getElementById('edit-pay-stage').value.trim();
+  const amount = Number(document.getElementById('edit-pay-amount').value) || 0;
+  const status = document.getElementById('edit-pay-status').value;
+  const notes = document.getElementById('edit-pay-notes').value.trim();
+
+  try {
+    const res = await fetch(`/api/mandor-payouts/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mandor_name,
+        milestone_stage,
+        amount,
+        status,
+        notes
+      })
+    });
+    if (res.ok) {
+      closeModal('modalEditMandorPayout');
+      loadMandorPayouts();
+      loadDashboardStats();
+    } else {
+      const err = await res.json();
+      alert(err.message || 'Gagal menyimpan perubahan kas keluar.');
+    }
+  } catch (err) {
+    console.error('Error updating payout:', err);
+    alert('Terjadi kesalahan saat memperbarui kas keluar.');
+  }
+}
+
+async function deleteMandorPayout(payoutId, mandorName, amount) {
+  if (!confirm(`Apakah Anda yakin ingin menghapus catatan kas keluar untuk ${mandorName} senilai ${formatIDR(amount)}?\n\nData yang dihapus tidak dapat dipulihkan.`)) {
+    return;
+  }
+  try {
+    const res = await fetch(`/api/mandor-payouts/${payoutId}`, {
+      method: 'DELETE'
+    });
+    if (res.ok) {
+      loadMandorPayouts();
+      loadDashboardStats();
+    } else {
+      const err = await res.json();
+      alert(err.message || 'Gagal menghapus kas keluar.');
+    }
+  } catch (err) {
+    console.error('Error deleting payout:', err);
+    alert('Terjadi kesalahan saat menghapus kas keluar.');
   }
 }
 
@@ -815,6 +1290,9 @@ async function payMandorPayout(id) {
 // -------------------------------------------------------------
 // 5. MASTER EXECUTORS
 // -------------------------------------------------------------
+let executorActiveFilter = 'All'; // 'All' | 'Internal' | 'Mandor'
+let executorSearchQuery = '';
+
 async function loadExecutors() {
   try {
     const res = await fetch('/api/executors');
@@ -825,54 +1303,425 @@ async function loadExecutors() {
   }
 }
 
+function setExecutorFilter(type) {
+  executorActiveFilter = type;
+  ['all', 'internal', 'mandor'].forEach(t => {
+    const btn = document.getElementById(`btn-filter-exec-${t}`);
+    if (!btn) return;
+    const isSelected = (t === 'all' && type === 'All') || (t.toLowerCase() === type.toLowerCase());
+    if (isSelected) {
+      btn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer bg-slate-900 text-white shadow-xs';
+    } else {
+      btn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer text-slate-600 hover:bg-slate-100';
+    }
+  });
+  renderExecutors();
+}
+
+function handleExecutorSearch(query) {
+  executorSearchQuery = (query || '').toLowerCase().trim();
+  renderExecutors();
+}
+
 function renderExecutors() {
   const container = document.getElementById('executors-grid');
   if (!container) return;
 
-  const canEdit = currentUser && ['superadmin', 'direktur', 'pm'].includes(currentUser.role);
+  const canManage = currentUser && ['superadmin', 'direktur', 'pm'].includes(currentUser.role);
+  const canDelete = currentUser && ['superadmin', 'direktur'].includes(currentUser.role);
 
-  container.innerHTML = executorsData.map(e => {
+  // Helper untuk mendapatkan list WO aktif per eksekutor dari projectsData
+  const getActiveWOsForExecutor = (e) => {
+    return (projectsData || []).filter(p => {
+      const matchId = p.executor_id && p.executor_id === e.id;
+      const matchName = p.executor_name && p.executor_name.trim().toLowerCase() === e.name.trim().toLowerCase();
+      const isActive = p.status !== 'Selesai' && p.status !== 'Done';
+      return (matchId || matchName) && isActive;
+    });
+  };
+
+  // Update Summary KPI Cards
+  const totalCount = executorsData.length;
+  const internalCount = executorsData.filter(e => e.type === 'Internal').length;
+  const mandorCount = executorsData.filter(e => e.type === 'Mandor').length;
+  const totalActiveWOs = (projectsData || []).filter(p => p.status !== 'Selesai' && p.status !== 'Done').length;
+
+  const elTotal = document.getElementById('kpi-exec-total');
+  const elInternal = document.getElementById('kpi-exec-internal');
+  const elMandor = document.getElementById('kpi-exec-mandor');
+  const elActive = document.getElementById('kpi-exec-active-wos');
+  const elCountAll = document.getElementById('count-exec-all');
+  const elCountInt = document.getElementById('count-exec-internal');
+  const elCountMan = document.getElementById('count-exec-mandor');
+
+  if (elTotal) elTotal.textContent = totalCount;
+  if (elInternal) elInternal.textContent = internalCount;
+  if (elMandor) elMandor.textContent = mandorCount;
+  if (elActive) elActive.textContent = totalActiveWOs;
+  if (elCountAll) elCountAll.textContent = totalCount;
+  if (elCountInt) elCountInt.textContent = internalCount;
+  if (elCountMan) elCountMan.textContent = mandorCount;
+
+  // Filter Data
+  let list = [...executorsData];
+  if (executorActiveFilter !== 'All') {
+    list = list.filter(e => e.type === executorActiveFilter);
+  }
+  if (executorSearchQuery) {
+    list = list.filter(e => {
+      const combined = `${e.name || ''} ${e.pic || ''} ${e.phone || ''} ${e.wilayah || ''} ${e.specialization || ''} ${e.fleet_no || ''}`.toLowerCase();
+      return combined.includes(executorSearchQuery);
+    });
+  }
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div class="col-span-full bg-white p-12 text-center rounded-2xl border border-slate-200">
+        <i data-lucide="users" class="w-12 h-12 text-slate-300 mx-auto mb-3"></i>
+        <h4 class="font-bold text-slate-700 text-sm">Tidak ada data eksekutor yang sesuai</h4>
+        <p class="text-xs text-slate-400 mt-1">Coba sesuaikan filter kategori atau kata kunci pencarian Anda.</p>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+
+  container.innerHTML = list.map(e => {
     const isInt = e.type === 'Internal';
-    const editBtn = canEdit ? `
-      <button onclick="editExecutor('${e.id}')" class="text-sky-600 hover:text-sky-800" title="Edit">
-        <i data-lucide="edit" class="w-4 h-4"></i>
-      </button>
-    ` : '';
+    const activeWOs = getActiveWOsForExecutor(e);
+    const cleanPhone = (e.phone || '').replace(/[^0-9]/g, '').replace(/^0/, '62');
+
+    // Status Badge
+    let statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">Aktif</span>';
+    if (e.status === 'Standby') {
+      statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">Standby</span>';
+    } else if (e.status === 'Non-Aktif') {
+      statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">Non-Aktif</span>';
+    }
+
+    // Tipe Badge
+    const typeBadge = isInt
+      ? '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-bold bg-sky-100 text-sky-800 border border-sky-200"><i data-lucide="shield" class="w-3 h-3"></i> Tim Internal</span>'
+      : '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200"><i data-lucide="hard-hat" class="w-3 h-3"></i> Mandor / Subkon</span>';
+
+    // Rincian WO Aktif
+    let woSectionHtml = '';
+    if (activeWOs.length > 0) {
+      woSectionHtml = `
+        <div class="pt-3 border-t border-slate-200/80 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <i data-lucide="folder-git-2" class="w-3.5 h-3.5 text-sky-600"></i>
+              <span>WO Aktif (${activeWOs.length} Proyek Berjalan)</span>
+            </span>
+            <span class="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200">
+              Sedang Dikerjakan
+            </span>
+          </div>
+
+          <div class="space-y-2 max-h-56 overflow-y-auto pr-1">
+            ${activeWOs.map(wo => {
+              let clientBadge = 'bg-sky-100 text-sky-800 border-sky-300';
+              if (wo.client_name.includes('Icon')) clientBadge = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+              if (wo.client_name.includes('ID Net')) clientBadge = 'bg-purple-100 text-purple-800 border-purple-300';
+
+              const prog = Number(wo.progress_percent) || 0;
+              return `
+                <div class="p-2.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs hover:border-sky-400 transition flex flex-col gap-1.5">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="font-mono font-bold text-xs text-slate-900">${wo.wo_number}</span>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${clientBadge}">${wo.client_name}</span>
+                  </div>
+                  <div class="text-[11px] text-slate-600 flex items-center justify-between gap-2">
+                    <span class="truncate flex items-center gap-1" title="${wo.cluster_name}">
+                      <i data-lucide="map-pin" class="w-3 h-3 text-slate-400 shrink-0"></i>
+                      <span class="truncate font-medium">${wo.cluster_name || '-'}</span>
+                    </span>
+                    <span class="text-slate-400 text-[10px] shrink-0 font-medium">Target: ${wo.target_date || '-'}</span>
+                  </div>
+                  <div class="flex items-center gap-2 pt-0.5">
+                    <div class="flex-1 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                      <div class="bg-emerald-500 h-1.5 rounded-full" style="width: ${prog}%"></div>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-700 w-8 text-right">${prog}%</span>
+                  </div>
+                  <button type="button" onclick="jumpToProject('${wo.id}')" class="mt-1 w-full py-1 px-2.5 bg-slate-50 hover:bg-sky-50 text-slate-700 hover:text-sky-700 border border-slate-200 hover:border-sky-300 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer">
+                    <i data-lucide="external-link" class="w-3 h-3 text-sky-600"></i>
+                    <span>Buka di Manajemen WO</span>
+                  </button>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    } else {
+      woSectionHtml = `
+        <div class="pt-3 border-t border-slate-200/80">
+          <div class="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div class="flex items-center gap-2 text-emerald-800 text-xs font-semibold">
+              <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+              <span>0 WO Aktif (Standby / Siap Ditugaskan)</span>
+            </div>
+            ${canManage ? `
+              <button type="button" onclick="quickAssignWO('${e.id}', '${e.type}')" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-semibold flex items-center gap-1 shadow-2xs transition cursor-pointer shrink-0">
+                <i data-lucide="plus" class="w-3 h-3"></i> Tugaskan WO
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }
 
     return `
-      <div class="p-5 rounded-2xl border ${isInt ? 'border-sky-200 bg-sky-50/30' : 'border-amber-200 bg-amber-50/30'} flex flex-col justify-between">
+      <div class="p-5 rounded-2xl border ${isInt ? 'border-sky-200 bg-sky-50/20' : 'border-amber-200 bg-amber-50/20'} flex flex-col justify-between shadow-2xs hover:shadow-xs transition">
         <div>
-          <div class="flex justify-between items-start mb-2">
-            <span class="px-2.5 py-0.5 rounded text-[11px] font-bold ${isInt ? 'bg-sky-100 text-sky-800' : 'bg-amber-100 text-amber-800'}">
-              ${isInt ? 'Tim Internal' : 'Mandor / Subkon'}
-            </span>
-            <span class="text-xs font-bold text-amber-600 flex items-center gap-1">
-              ★ ${e.rating || '5.0'}
-            </span>
+          <!-- Header Card -->
+          <div class="flex justify-between items-start gap-2 mb-2.5">
+            <div class="flex items-center gap-2 flex-wrap">
+              ${typeBadge}
+              ${statusBadge}
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="text-xs font-bold text-amber-600 flex items-center gap-0.5">
+                ★ ${Number(e.rating || 5.0).toFixed(1)}
+              </span>
+              <div class="flex items-center gap-1">
+                ${canManage ? `
+                  <button type="button" onclick="editExecutor('${e.id}')" class="p-1 text-slate-500 hover:text-sky-600 hover:bg-sky-50 rounded-md transition cursor-pointer" title="Edit Data Eksekutor">
+                    <i data-lucide="edit" class="w-3.5 h-3.5"></i>
+                  </button>
+                ` : ''}
+                ${canDelete ? `
+                  <button type="button" onclick="deleteExecutor('${e.id}', '${(e.name || '').replace(/'/g, "\\'")}')" class="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition cursor-pointer" title="Hapus Eksekutor">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                  </button>
+                ` : ''}
+              </div>
+            </div>
           </div>
 
-          <div class="flex justify-between items-start">
-            <h3 class="font-bold text-slate-900 text-base mb-1">${e.name}</h3>
-            ${editBtn}
+          <!-- Nama & Kontak -->
+          <h3 class="font-bold text-slate-900 text-base leading-snug">${e.name}</h3>
+          ${e.pic ? `<p class="text-xs text-slate-600 font-medium mt-0.5"><span class="text-slate-400">Koordinator/PIC:</span> ${e.pic}</p>` : ''}
+          
+          <div class="mt-1.5 flex items-center gap-3 flex-wrap text-xs">
+            ${cleanPhone ? `
+              <a href="https://wa.me/${cleanPhone}" target="_blank" rel="noopener" class="text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1 font-semibold" title="Hubungi via WhatsApp">
+                <i data-lucide="message-circle" class="w-3.5 h-3.5 text-emerald-600"></i> ${e.phone}
+              </a>
+            ` : `<span class="text-slate-500 flex items-center gap-1"><i data-lucide="phone" class="w-3.5 h-3.5"></i> ${e.phone || '-'}</span>`}
           </div>
-          <p class="text-xs text-slate-500 mb-2 flex items-center gap-1.5">
-            <i data-lucide="phone" class="w-3.5 h-3.5"></i> ${e.phone}
-          </p>
 
-          <div class="p-2.5 bg-white rounded-xl border border-slate-100 text-xs space-y-1 my-3">
-            <span class="text-[10px] text-slate-400 font-bold uppercase block">Standar Biaya / Upah:</span>
-            <p class="text-slate-700 font-medium">${e.standard_rates}</p>
+          <!-- Wilayah, Armada & Spesialisasi -->
+          <div class="grid grid-cols-2 gap-2 my-2.5 text-xs text-slate-600 bg-white/70 p-2.5 rounded-xl border border-slate-200/70">
+            <div>
+              <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Wilayah / Basecamp:</span>
+              <span class="font-medium text-slate-800 truncate block">${e.wilayah || 'Surabaya & Sekitarnya'}</span>
+            </div>
+            <div>
+              <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Armada / Plat:</span>
+              <span class="font-medium text-slate-800 truncate block">${e.fleet_no || '-'}</span>
+            </div>
+          </div>
+
+          ${e.specialization ? `
+            <div class="mb-2.5">
+              <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white border border-slate-200 text-slate-700 shadow-2xs">
+                <i data-lucide="wrench" class="w-3 h-3 text-slate-500"></i> ${e.specialization}
+              </span>
+            </div>
+          ` : ''}
+
+          <!-- Tarif / Uang Jalan Box -->
+          <div class="p-2.5 bg-white rounded-xl border border-slate-200/80 text-xs space-y-1 mb-3 shadow-2xs">
+            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Standar Biaya / Upah:</span>
+            <p class="text-slate-700 font-medium leading-relaxed">${e.standard_rates || 'Sesuai kesepakatan SPK'}</p>
           </div>
         </div>
 
-        <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span>WO Aktif: <b class="text-slate-800">${e.active_wos || 0} Proyek</b></span>
-          <span class="text-sky-600 font-semibold">Tersedia</span>
-        </div>
+        <!-- Section WO Aktif Terintegrasi -->
+        ${woSectionHtml}
       </div>
     `;
   }).join('');
+
   if (window.lucide) lucide.createIcons();
+}
+
+async function jumpToProject(projectId) {
+  // 1. Switch to projects tab
+  handleNavClick('projects');
+
+  // 2. Reset filters so the target project is always visible
+  const filterClient = document.getElementById('filter-client');
+  const filterExec = document.getElementById('filter-executor');
+  const filterStatus = document.getElementById('filter-status');
+  if (filterClient) filterClient.value = 'All';
+  if (filterExec) filterExec.value = 'All';
+  if (filterStatus) filterStatus.value = 'All';
+
+  // 3. Re-render/reload projects if needed
+  await loadProjects();
+
+  // 4. Smooth scroll to project card & pulse highlight
+  setTimeout(() => {
+    const el = document.getElementById(`project-card-${projectId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('ring-4', 'ring-sky-400', 'ring-offset-2', 'bg-sky-50/60');
+      setTimeout(() => {
+        el.classList.remove('ring-4', 'ring-sky-400', 'ring-offset-2', 'bg-sky-50/60');
+      }, 3000);
+    }
+  }, 200);
+}
+
+function quickAssignWO(executorId, executorType) {
+  openModal('modalAddProject');
+  const type = executorType === 'Internal' ? 'Internal' : 'Mandor';
+  const radio = document.querySelector(`input[name="modal_executor_type"][value="${type}"]`);
+  if (radio) {
+    radio.checked = true;
+    populateExecutorModalOptions();
+  }
+  const select = document.getElementById('modal-executor-id');
+  if (select && executorId) {
+    select.value = executorId;
+  }
+}
+
+function openModalAddExecutor() {
+  resetExecutorForm();
+  openModal('modalEditExecutor');
+}
+
+function resetExecutorForm() {
+  const form = document.getElementById('formEditExecutor');
+  if (form) form.reset();
+  document.getElementById('modal-exec-id').value = '';
+  document.getElementById('executorModalTitle').textContent = 'Tambah Eksekutor Baru';
+  const mandorRadio = document.querySelector('input[name="modal_form_exec_type"][value="Mandor"]');
+  if (mandorRadio) mandorRadio.checked = true;
+  document.getElementById('modal-exec-status').value = 'Aktif';
+  document.getElementById('modal-exec-rating').value = 5.0;
+  onModalExecTypeChange();
+}
+
+function onModalExecTypeChange() {
+  const isInternal = document.querySelector('input[name="modal_form_exec_type"]:checked')?.value === 'Internal';
+  const ratesEl = document.getElementById('modal-exec-rates');
+  const fleetEl = document.getElementById('modal-exec-fleet');
+  if (ratesEl && !ratesEl.value) {
+    ratesEl.placeholder = isInternal
+      ? 'Contoh: Uang Jalan: Rp 450.000/hari + Bahan Bakar Operasional'
+      : 'Contoh: Tiang: Rp 65.000/btg | Tarik KU: Rp 1.800/m | ODP: Rp 150.000/titik';
+  }
+  if (fleetEl && !fleetEl.value) {
+    fleetEl.placeholder = isInternal ? 'Contoh: L-9142-TA / GranMax' : 'Contoh: Armada Mandor / -';
+  }
+}
+
+function editExecutor(id) {
+  const exec = executorsData.find(e => e.id === id);
+  if (!exec) return;
+
+  document.getElementById('modal-exec-id').value = exec.id;
+  document.getElementById('modal-exec-name').value = exec.name || '';
+  
+  const type = exec.type === 'Internal' ? 'Internal' : 'Mandor';
+  const radio = document.querySelector(`input[name="modal_form_exec_type"][value="${type}"]`);
+  if (radio) radio.checked = true;
+
+  document.getElementById('modal-exec-pic').value = exec.pic || '';
+  document.getElementById('modal-exec-phone').value = exec.phone || '';
+  document.getElementById('modal-exec-fleet').value = exec.fleet_no || '';
+  document.getElementById('modal-exec-wilayah').value = exec.wilayah || '';
+  document.getElementById('modal-exec-specialization').value = exec.specialization || '';
+  document.getElementById('modal-exec-rates').value = exec.standard_rates || '';
+  document.getElementById('modal-exec-status').value = exec.status || 'Aktif';
+  document.getElementById('modal-exec-rating').value = exec.rating !== undefined ? exec.rating : 5.0;
+
+  document.getElementById('executorModalTitle').textContent = 'Edit Data Eksekutor';
+  openModal('modalEditExecutor');
+}
+
+async function submitExecutor(e) {
+  e.preventDefault();
+
+  const id = document.getElementById('modal-exec-id').value;
+  const type = document.querySelector('input[name="modal_form_exec_type"]:checked')?.value || 'Mandor';
+  const payload = {
+    name: document.getElementById('modal-exec-name').value.trim(),
+    type,
+    pic: document.getElementById('modal-exec-pic').value.trim(),
+    phone: document.getElementById('modal-exec-phone').value.trim(),
+    fleet_no: document.getElementById('modal-exec-fleet').value.trim(),
+    wilayah: document.getElementById('modal-exec-wilayah').value.trim(),
+    specialization: document.getElementById('modal-exec-specialization').value.trim(),
+    standard_rates: document.getElementById('modal-exec-rates').value.trim(),
+    status: document.getElementById('modal-exec-status').value,
+    rating: parseFloat(document.getElementById('modal-exec-rating').value) || 5.0
+  };
+
+  if (!payload.name) {
+    alert('Nama Tim / Mandor wajib diisi.');
+    return;
+  }
+  if (!payload.phone) {
+    alert('Nomor Telepon / WhatsApp wajib diisi.');
+    return;
+  }
+
+  try {
+    let res;
+    if (id) {
+      res = await fetch('/api/executors/' + id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } else {
+      res = await fetch('/api/executors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    }
+
+    const data = await res.json();
+    if (res.ok) {
+      closeModal('modalEditExecutor');
+      resetExecutorForm();
+      await Promise.all([loadExecutors(), loadProjects()]);
+      renderExecutors();
+    } else {
+      alert(data.message || 'Gagal menyimpan data eksekutor');
+    }
+  } catch(err) {
+    console.error('Error saving executor:', err);
+    alert('Terjadi kesalahan koneksi saat menyimpan eksekutor.');
+  }
+}
+
+async function deleteExecutor(id, name) {
+  if (!confirm(`Hapus eksekutor "${name}" dari sistem?`)) return;
+
+  try {
+    const res = await fetch('/api/executors/' + id, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    if (res.ok) {
+      await Promise.all([loadExecutors(), loadProjects()]);
+      renderExecutors();
+    } else {
+      alert(data.message || 'Gagal menghapus eksekutor.');
+    }
+  } catch(err) {
+    console.error('Error deleting executor:', err);
+    alert('Terjadi kesalahan koneksi saat menghapus eksekutor.');
+  }
 }
 
 function populateExecutorModalOptions() {
@@ -883,7 +1732,7 @@ function populateExecutorModalOptions() {
   const filtered = executorsData.filter(e => e.type === type);
 
   select.innerHTML = filtered.map(e => `
-    <option value="${e.id}">${e.name} (${e.phone})</option>
+    <option value="${e.id}">${e.name} ${e.pic ? '- PIC: ' + e.pic : ''} (${e.phone})</option>
   `).join('');
 }
 
@@ -900,8 +1749,11 @@ function openModal(id) {
 
   if (id === 'modalAddProject') {
     populateExecutorModalOptions();
+    populateSpDropdown();
   } else if (id === 'modalAddInvoice') {
-    populateInvoiceProjectOptions();
+    populateInvoiceSpOptions();
+  } else if (id === 'modalAddMandorPayout') {
+    populateMandorPayoutProjectOptions();
   }
 }
 
@@ -987,12 +1839,125 @@ async function submitUpdateMilestone(e) {
   }
 }
 
+function populateSpDropdown() {
+  const select = document.getElementById('modal-sp-select');
+  const inputWo = document.getElementById('modal-wo');
+  const containerCustom = document.getElementById('container-custom-sp');
+  const btnToggle = document.getElementById('btn-toggle-sp-input');
+  if (!select || !inputWo) return;
+
+  // Ambil list unik nomor SP/PO dari projectsData
+  const existingSps = Array.from(new Set((projectsData || []).map(p => (p.wo_number || '').trim()).filter(Boolean)));
+
+  if (existingSps.length === 0) {
+    select.classList.add('hidden');
+    if (containerCustom) containerCustom.classList.remove('hidden');
+    inputWo.required = true;
+    if (btnToggle) btnToggle.style.display = 'none';
+    return;
+  }
+
+  select.classList.remove('hidden');
+  if (btnToggle) {
+    btnToggle.style.display = 'inline-block';
+    btnToggle.textContent = '+ Input SP Baru';
+  }
+
+  let options = '<option value="">-- Pilih Nomor SP/PO Eksisting --</option>';
+  existingSps.forEach(sp => {
+    const relatedProj = (projectsData || []).find(p => p.wo_number === sp);
+    const clientNote = relatedProj ? ` (${relatedProj.client_name})` : '';
+    options += `<option value="${escapeQuote(sp)}">${sp}${clientNote}</option>`;
+  });
+  options += '<option value="__NEW__">+ Ketik Nomor SP/PO Baru...</option>';
+  select.innerHTML = options;
+
+  if (containerCustom) containerCustom.classList.add('hidden');
+  inputWo.value = '';
+  inputWo.required = false;
+}
+
+function handleSpSelectChange(val) {
+  const inputWo = document.getElementById('modal-wo');
+  const containerCustom = document.getElementById('container-custom-sp');
+  const btnToggle = document.getElementById('btn-toggle-sp-input');
+  const clientSelect = document.getElementById('modal-client');
+
+  if (val === '__NEW__') {
+    if (containerCustom) containerCustom.classList.remove('hidden');
+    if (inputWo) {
+      inputWo.value = '';
+      inputWo.required = true;
+      inputWo.focus();
+    }
+    if (btnToggle) btnToggle.textContent = 'Pilih SP Eksisting';
+  } else if (val) {
+    if (containerCustom) containerCustom.classList.add('hidden');
+    if (inputWo) {
+      inputWo.value = val;
+      inputWo.required = false;
+    }
+    if (btnToggle) btnToggle.textContent = '+ Input SP Baru';
+
+    // Otomatis sinkronkan Klien jika SP tersebut sudah terdaftar
+    const matched = (projectsData || []).find(p => p.wo_number === val);
+    if (matched && matched.client_name && clientSelect) {
+      clientSelect.value = matched.client_name;
+    }
+  } else {
+    if (containerCustom) containerCustom.classList.add('hidden');
+    if (inputWo) {
+      inputWo.value = '';
+      inputWo.required = false;
+    }
+  }
+}
+
+function toggleSpInputMode() {
+  const select = document.getElementById('modal-sp-select');
+  const containerCustom = document.getElementById('container-custom-sp');
+  const inputWo = document.getElementById('modal-wo');
+  const btnToggle = document.getElementById('btn-toggle-sp-input');
+  if (!containerCustom || !inputWo) return;
+
+  const isCustomHidden = containerCustom.classList.contains('hidden');
+  if (isCustomHidden) {
+    containerCustom.classList.remove('hidden');
+    if (select) select.value = '__NEW__';
+    inputWo.required = true;
+    inputWo.focus();
+    if (btnToggle) btnToggle.textContent = 'Pilih SP Eksisting';
+  } else {
+    containerCustom.classList.add('hidden');
+    if (select) select.value = '';
+    inputWo.value = '';
+    inputWo.required = false;
+    if (btnToggle) btnToggle.textContent = '+ Input SP Baru';
+  }
+}
+
 async function submitNewProject(e) {
   e.preventDefault();
   const client_name = document.getElementById('modal-client').value;
-  const wo_number = document.getElementById('modal-wo').value;
-  const cluster_name = document.getElementById('modal-cluster').value;
-  const executor_type = document.querySelector('input[name="modal_executor_type"]:checked').value;
+  
+  const spSelect = document.getElementById('modal-sp-select');
+  const inputWo = document.getElementById('modal-wo');
+  let wo_number = '';
+  if (inputWo && inputWo.value.trim()) {
+    wo_number = inputWo.value.trim();
+  } else if (spSelect && spSelect.value && spSelect.value !== '__NEW__') {
+    wo_number = spSelect.value.trim();
+  }
+
+  if (!wo_number) {
+    alert('Nomor SP/PO wajib diisi atau dipilih.');
+    if (spSelect && !spSelect.classList.contains('hidden')) spSelect.focus();
+    else if (inputWo) inputWo.focus();
+    return;
+  }
+
+  const cluster_name = document.getElementById('modal-cluster').value.trim();
+  const executor_type = document.querySelector('input[name="modal_executor_type"]:checked')?.value || 'Mandor';
   const executor_id = document.getElementById('modal-executor-id').value;
   const contract_value = document.getElementById('modal-contract-value').value;
   const mandor_cost = document.getElementById('modal-mandor-cost').value;
@@ -1016,70 +1981,192 @@ async function submitNewProject(e) {
     if (res.ok) {
       closeModal('modalAddProject');
       document.getElementById('formAddProject').reset();
-      loadProjects();
-      loadDashboardStats();
+      await Promise.all([loadProjects(), loadDashboardStats()]);
       switchTab('projects');
+    } else {
+      const errData = await res.json();
+      alert(errData.message || errData.error || 'Gagal menyimpan Work Order.');
     }
   } catch (err) {
     console.error('Error creating project:', err);
+    alert('Terjadi kesalahan koneksi saat membuat Work Order.');
   }
 }
 
-function populateInvoiceProjectOptions() {
-  const select = document.getElementById('modal-inv-project');
-  if (!select) return;
-  select.innerHTML = '<option value="" disabled selected>-- Pilih Work Order --</option>' + projectsData.map(p => `
-    <option value="${p.id}" data-wo="${p.wo_number}" data-client="${p.client_name}">${p.wo_number} - ${p.cluster_name} (${p.client_name})</option>
-  `).join('');
+function calculateDueDate2Months(invoiceDateStr) {
+  if (!invoiceDateStr) return '';
+  const d = new Date(invoiceDateStr);
+  d.setMonth(d.getMonth() + 2);
+  return d.toISOString().split('T')[0];
 }
 
-function autoFillInvoiceProjectInfo() {
-  const select = document.getElementById('modal-inv-project');
-  if (!select || select.selectedIndex < 0) return;
-  const opt = select.options[select.selectedIndex];
-  if (!opt || !opt.value) return;
+function populateInvoiceSpOptions() {
+  const select = document.getElementById('modal-inv-sp');
+  const idInput = document.getElementById('modal-inv-id');
+  const displayEl = document.getElementById('display-inv-wo-name');
+  const containerJob = document.getElementById('container-inv-job-select');
+  const selectJob = document.getElementById('modal-inv-job');
+  const termInput = document.getElementById('modal-inv-term');
+  const projIdInput = document.getElementById('modal-inv-project-id');
+  const dateInput = document.getElementById('modal-inv-date');
+  const amountInput = document.getElementById('modal-inv-amount');
+  if (!select) return;
 
-  const projId = opt.value;
-  const proj = projectsData.find(p => p.id === projId);
+  if (idInput) idInput.value = '';
 
   const today = new Date().toISOString().split('T')[0];
-  const dateInput = document.getElementById('modal-inv-date');
   if (dateInput && !dateInput.value) dateInput.value = today;
 
-  const dueDateInput = document.getElementById('modal-inv-due');
-  if (dueDateInput && !dueDateInput.value) {
-    const due = new Date();
-    due.setDate(due.getDate() + 30);
-    dueDateInput.value = due.toISOString().split('T')[0];
+  if (displayEl) {
+    displayEl.textContent = '-- Pilih Nomor SP/PO terlebih dahulu --';
+    displayEl.className = 'p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 font-medium text-xs';
+  }
+  if (containerJob) containerJob.classList.add('hidden');
+  if (selectJob) selectJob.innerHTML = '';
+  if (termInput) termInput.value = '';
+  if (projIdInput) projIdInput.value = '';
+  if (amountInput) amountInput.value = '';
+
+  // Kumpulkan UNIQUE Nomor SP/PO dari projectsData (1 SP = 1 entri saja, tidak dobel)
+  const spMap = new Map();
+  (projectsData || []).forEach(p => {
+    const spKey = (p.sp_number || p.wo_number || '').trim();
+    if (!spKey) return;
+    if (!spMap.has(spKey)) {
+      spMap.set(spKey, {
+        sp_number: spKey,
+        client_name: p.client_name,
+        jobs: []
+      });
+    }
+    spMap.get(spKey).jobs.push(p);
+  });
+
+  let html = '<option value="" disabled selected>-- Pilih Nomor SP/PO --</option>';
+  spMap.forEach(group => {
+    html += `<option value="${escapeQuote(group.sp_number)}" data-client="${escapeQuote(group.client_name)}">${group.sp_number} (${group.client_name})</option>`;
+  });
+  select.innerHTML = html;
+}
+
+// Alias untuk backward compatibility
+const populateInvoiceProjectOptions = populateInvoiceSpOptions;
+
+function onInvoiceSpChange() {
+  const select = document.getElementById('modal-inv-sp');
+  const displayEl = document.getElementById('display-inv-wo-name');
+  const containerJob = document.getElementById('container-inv-job-select');
+  const selectJob = document.getElementById('modal-inv-job');
+  const termInput = document.getElementById('modal-inv-term');
+  const projIdInput = document.getElementById('modal-inv-project-id');
+  const amountInput = document.getElementById('modal-inv-amount');
+
+  if (!select || !select.value) return;
+  const spKey = select.value.trim();
+
+  // Dapatkan seluruh pekerjaan di bawah SP ini
+  const jobs = (projectsData || []).filter(p => (p.sp_number || p.wo_number || '').trim().toLowerCase() === spKey.toLowerCase());
+
+  if (jobs.length === 0) {
+    if (displayEl) {
+      displayEl.textContent = 'Tidak ada pekerjaan terdaftar di bawah SP ini.';
+      displayEl.className = 'p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 font-medium text-xs';
+    }
+    if (containerJob) containerJob.classList.add('hidden');
+    return;
   }
 
-  const termInput = document.getElementById('modal-inv-term');
-  const amountInput = document.getElementById('modal-inv-amount');
-  if (proj && (!amountInput.value || Number(amountInput.value) === 0)) {
-    amountInput.value = Math.round(proj.contract_value * 0.3);
-    if (termInput && !termInput.value) {
-      termInput.value = `Termin 1 (30%) - ${proj.wo_number}`;
+  if (jobs.length === 1) {
+    // Tepat 1 pekerjaan di bawah SP ini
+    if (containerJob) containerJob.classList.add('hidden');
+    const j = jobs[0];
+    const woName = j.job_name || j.cluster_name || j.wo_number;
+    if (displayEl) {
+      displayEl.textContent = woName;
+      displayEl.className = 'p-2.5 bg-sky-50/70 border border-sky-200 rounded-lg text-slate-900 font-bold text-xs';
+    }
+    if (termInput) termInput.value = woName;
+    if (projIdInput) projIdInput.value = j.id;
+    if (amountInput) amountInput.value = Math.round((Number(j.contract_value) || 0) * 0.3);
+  } else {
+    // Banyak pekerjaan di bawah 1 SP (misal: 2 pekerjaan berbeda)
+    if (containerJob) containerJob.classList.remove('hidden');
+
+    const totalBOQ = jobs.reduce((sum, j) => sum + (Number(j.contract_value) || 0), 0);
+    let jobOptions = '';
+    jobs.forEach(j => {
+      const jName = j.job_name || j.cluster_name || j.wo_number;
+      jobOptions += `<option value="${j.id}" data-wo="${escapeQuote(jName)}" data-boq="${j.contract_value || 0}">${jName} (BOQ: ${formatIDR(j.contract_value)})</option>`;
+    });
+    const allNames = jobs.map(j => j.job_name || j.cluster_name).join(', ');
+    jobOptions += `<option value="all" data-wo="${escapeQuote(allNames)}" data-boq="${totalBOQ}">Gabungan Seluruh Pekerjaan SP (Total BOQ: ${formatIDR(totalBOQ)})</option>`;
+
+    if (selectJob) {
+      selectJob.innerHTML = jobOptions;
+      selectJob.selectedIndex = 0;
+      onInvoiceJobChange();
     }
   }
+}
+
+function onInvoiceJobChange() {
+  const selectJob = document.getElementById('modal-inv-job');
+  const displayEl = document.getElementById('display-inv-wo-name');
+  const termInput = document.getElementById('modal-inv-term');
+  const projIdInput = document.getElementById('modal-inv-project-id');
+  const amountInput = document.getElementById('modal-inv-amount');
+  if (!selectJob || selectJob.selectedIndex < 0) return;
+
+  const opt = selectJob.options[selectJob.selectedIndex];
+  const jobId = opt.value;
+  const woName = opt.getAttribute('data-wo') || opt.text;
+  const boqVal = Number(opt.getAttribute('data-boq')) || 0;
+
+  if (displayEl) {
+    displayEl.textContent = woName;
+    displayEl.className = 'p-2.5 bg-sky-50/70 border border-sky-200 rounded-lg text-slate-900 font-bold text-xs';
+  }
+  if (termInput) termInput.value = woName;
+  if (projIdInput) {
+    if (jobId === 'all') {
+      const spVal = document.getElementById('modal-inv-sp')?.value;
+      const matched = (projectsData || []).find(p => (p.sp_number || p.wo_number) === spVal);
+      projIdInput.value = matched ? matched.id : 'all';
+    } else {
+      projIdInput.value = jobId;
+    }
+  }
+  if (amountInput) amountInput.value = Math.round(boqVal * 0.3);
 }
 
 async function submitNewInvoice(e) {
   e.preventDefault();
-  const select = document.getElementById('modal-inv-project');
-  const opt = select.options[select.selectedIndex];
-  const project_id = opt.value;
-  const wo_number = opt.getAttribute('data-wo');
-  const client_name = opt.getAttribute('data-client');
-  const term_name = document.getElementById('modal-inv-term').value;
-  const amount = document.getElementById('modal-inv-amount').value;
-  const invoice_date = document.getElementById('modal-inv-date').value;
-  const due_date = document.getElementById('modal-inv-due').value;
+  const id = document.getElementById('modal-inv-id')?.value.trim();
+  if (!id) {
+    alert('ID Invoice wajib diisi.');
+    return;
+  }
+
+  const spSelect = document.getElementById('modal-inv-sp');
+  if (!spSelect || !spSelect.value) {
+    alert('Pilih Nomor SP/PO terlebih dahulu.');
+    return;
+  }
+  const wo_number = spSelect.value.trim();
+  const matchedProj = (projectsData || []).find(p => (p.sp_number || p.wo_number || '').trim().toLowerCase() === wo_number.toLowerCase());
+  const client_name = matchedProj ? matchedProj.client_name : (spSelect.selectedOptions[0]?.getAttribute('data-client') || 'Telkom Akses');
+  const project_id = document.getElementById('modal-inv-project-id')?.value || (matchedProj ? matchedProj.id : 'proj-none');
+  const term_name = document.getElementById('modal-inv-term')?.value || wo_number;
+  const amount = document.getElementById('modal-inv-amount')?.value;
+  const invoice_date = document.getElementById('modal-inv-date')?.value || new Date().toISOString().split('T')[0];
+  const due_date = calculateDueDate2Months(invoice_date);
 
   try {
     const res = await fetch('/api/invoices', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        id,
         project_id,
         wo_number,
         client_name,
@@ -1087,17 +2174,22 @@ async function submitNewInvoice(e) {
         amount,
         invoice_date,
         due_date,
-        status: 'Invoice Terkirim'
+        status: 'Belum Cashbank'
       })
     });
     if (res.ok) {
       closeModal('modalAddInvoice');
       document.getElementById('formAddInvoice').reset();
+      populateInvoiceSpOptions();
       loadInvoices();
       loadDashboardStats();
+    } else {
+      const err = await res.json();
+      alert(err.message || 'Gagal membuat tagihan.');
     }
   } catch (err) {
     console.error('Error creating invoice:', err);
+    alert('Terjadi kesalahan saat membuat tagihan.');
   }
 }
 
@@ -1132,6 +2224,9 @@ async function loadUsers() {
       tbody.appendChild(tr);
     });
     if(window.lucide) lucide.createIcons();
+    if (currentUser && currentUser.role === 'superadmin') {
+      loadTelegramUsers();
+    }
   } catch (err) {
     console.error('Error loading users:', err);
   }
@@ -1184,6 +2279,9 @@ async function submitResetPassword(e) {
     if (res.ok) {
       closeModal('modalResetPassword');
       alert('Password berhasil diubah!');
+    } else {
+      const data = await res.json();
+      alert(data.message || 'Gagal mengubah password.');
     }
   } catch(err) {
     console.error(err);
@@ -1206,83 +2304,118 @@ async function deleteUser(id) {
 }
 
 // -------------------------------------------------------------
-// EXECUTOR MANAGEMENT
+// TELEGRAM BOT USERS MANAGEMENT (SUPER ADMIN)
 // -------------------------------------------------------------
-function resetExecutorForm() {
-  document.getElementById('formEditExecutor').reset();
-  document.getElementById('modal-exec-id').value = '';
-  document.getElementById('executorModalTitle').textContent = 'Tambah Eksekutor Baru';
-}
-
-function editExecutor(id) {
-  const exec = executorsData.find(e => e.id === id);
-  if (!exec) return;
-  
-  document.getElementById('modal-exec-id').value = exec.id;
-  document.getElementById('modal-exec-name').value = exec.name;
-  document.getElementById('modal-exec-type').value = exec.type;
-  document.getElementById('modal-exec-phone').value = exec.phone;
-  document.getElementById('modal-exec-fleet').value = exec.fleet_no || '';
-  document.getElementById('modal-exec-rates').value = exec.standard_rates || '';
-  
-  document.getElementById('executorModalTitle').textContent = 'Edit Data Eksekutor';
-  openModal('modalEditExecutor');
-}
-
-async function submitExecutor(e) {
-  e.preventDefault();
-  
-  const id = document.getElementById('modal-exec-id').value;
-  const payload = {
-    name: document.getElementById('modal-exec-name').value,
-    type: document.getElementById('modal-exec-type').value,
-    phone: document.getElementById('modal-exec-phone').value,
-    fleet_no: document.getElementById('modal-exec-fleet').value,
-    standard_rates: document.getElementById('modal-exec-rates').value
-  };
-
+async function loadTelegramUsers() {
+  const tbody = document.getElementById('tg-users-table-body');
+  if (!tbody) return;
   try {
-    let res;
-    if (id) {
-      // Edit
-      res = await fetch('/api/executors/' + id, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-    } else {
-      // Add
-      res = await fetch('/api/executors', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-    }
+    const res = await fetch('/api/telegram-users');
+    telegramUsersData = await res.json();
+    if (!res.ok) throw new Error(telegramUsersData.message || 'Gagal memuat user Telegram');
     
-    if (res.ok) {
-      closeModal('modalEditExecutor');
-      resetExecutorForm();
-      await loadExecutors();
-      renderExecutors();
-    } else {
-      const data = await res.json();
-      alert(data.message || 'Gagal menyimpan data eksekutor');
+    if (telegramUsersData.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" class="p-6 text-center text-slate-400 text-xs">
+            Belum ada akun Telegram yang terdaftar. Tambahkan manual atau klaim via /claim_superadmin di bot.
+          </td>
+        </tr>
+      `;
+      return;
     }
-  } catch(err) {
-    console.error('Error saving executor:', err);
+
+    tbody.innerHTML = telegramUsersData.map(u => {
+      let roleBadge = '';
+      if (u.role === 'superadmin') {
+        roleBadge = '<span class="bg-fuchsia-100 text-fuchsia-700 px-2 py-0.5 rounded text-[10px] font-bold">SUPERADMIN</span>';
+      } else if (u.role === 'pm') {
+        roleBadge = '<span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold">PM / APPROVER</span>';
+      } else if (u.role === 'admin') {
+        roleBadge = '<span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-[10px] font-bold">ADMIN GUDANG</span>';
+      } else {
+        roleBadge = '<span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold">TEKNISI</span>';
+      }
+
+      const regDate = u.registered_at ? new Date(u.registered_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '-';
+
+      return `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-mono font-semibold text-slate-800">${u.telegram_id}</td>
+          <td class="p-3 font-semibold text-slate-800">${u.name}</td>
+          <td class="p-3 text-slate-500">${u.username ? '@' + u.username : '-'}</td>
+          <td class="p-3">${roleBadge}</td>
+          <td class="p-3 text-slate-500 text-[11px]">${regDate}</td>
+          <td class="p-3 text-center">
+            <button onclick="deleteTelegramUser('${u.id}', '${u.name}')" class="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 cursor-pointer" title="Hapus User Bot">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    if (window.lucide) lucide.createIcons();
+  } catch (err) {
+    console.error('Error loading Telegram users:', err);
   }
 }
+
+async function submitNewTelegramUser(e) {
+  e.preventDefault();
+  const tgId = document.getElementById('modal-tg-id').value.trim();
+  const name = document.getElementById('modal-tg-name').value.trim();
+  const role = document.getElementById('modal-tg-role').value;
+
+  if (!tgId || !name) {
+    alert('ID Telegram dan Nama Pengguna wajib diisi.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/telegram-users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telegram_id: tgId, name, role })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      closeModal('modalAddTelegramUser');
+      document.getElementById('formAddTelegramUser').reset();
+      alert('Pengguna Telegram berhasil didaftarkan.');
+      await loadTelegramUsers();
+    } else {
+      alert(data.message || 'Gagal mendaftarkan pengguna Telegram.');
+    }
+  } catch (err) {
+    console.error('Error adding Telegram user:', err);
+    alert('Terjadi kesalahan saat mendaftarkan user.');
+  }
+}
+
+async function deleteTelegramUser(id, name) {
+  if (!confirm(`Hapus hak akses bot Telegram untuk "${name}"?`)) return;
+  try {
+    const res = await fetch(`/api/telegram-users/${id}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    if (res.ok) {
+      await loadTelegramUsers();
+    } else {
+      alert(data.message || 'Gagal menghapus pengguna Telegram.');
+    }
+  } catch (err) {
+    console.error('Error deleting Telegram user:', err);
+  }
+}
+
+// (Catatan: Logika Executor Management terpusat di Section 5)
 
 // -------------------------------------------------------------
 // 8. GALLERY MANAGEMENT (SUPER ADMIN)
 // -------------------------------------------------------------
 let galleryData = [];
-let materialsData = [];
-let bonData = [];
-let currentBonId = null;
-let bonItemsDraft = [];
-let canManageBon = false;
-let materialStockChartInstance = null;
 
 
 const categoryBadgeMap = {
@@ -1615,10 +2748,11 @@ async function loadBonMaterials() {
 }
 
 async function loadBonMaterialTab() {
-  await Promise.all([loadMaterials(), loadBonMaterials()]);
+  await Promise.all([loadMaterials(), loadBonMaterials(), loadBonRequests()]);
   populateBonWOSelect();
   populateBonItemMaterialOptions();
   renderMaterialsList();
+  renderBonPendingRequests();
   onBonWOChange();
 }
 
@@ -1658,7 +2792,7 @@ function renderBonDetail(bon) {
   const btnCreate = document.getElementById('btnCreateBon');
   detail.classList.remove('hidden');
   if (btnCreate) btnCreate.style.display = 'none';
-  document.getElementById('bon-detail-wo').textContent = `${bon.wo_number} — Bon Material`;
+  document.getElementById('bon-detail-wo').textContent = `${bon.wo_number} - Bon Material`;
   document.getElementById('bon-detail-meta').textContent =
     `Dibuat: ${bon.created_at} • Diupdate: ${bon.updated_at} • ${bon.items.length} item`;
   document.getElementById('bon-status-select').value = bon.status;
@@ -1699,7 +2833,7 @@ function renderBonItems() {
           <th class="p-3 text-center">Satuan</th>
           <th class="p-3 text-center">Rencana</th>
           <th class="p-3 text-center">Datang</th>
-          <th class="p-3 text-center">Terpakai</th>
+          <th class="p-3 text-center" title="Pengurangan stok gudang otomatis dihitung saat disimpan">Terpasang (potong gudang)</th>
           <th class="p-3 text-center">Sisa</th>
           ${canManageBon ? '<th class="p-3"></th>' : ''}
         </tr>
@@ -1749,7 +2883,7 @@ function populateBonItemMaterialOptions() {
   let html = '<option value="">-- Pilih material --</option>';
   Object.keys(grouped).forEach(cat => {
     html += `<optgroup label="${cat}">` + grouped[cat].map(m =>
-      `<option value="${m.id}" data-name="${m.name}" data-category="${m.category}" data-variant="${m.variant}" data-unit="${m.unit}">${m.name}${m.variant ? ' - ' + m.variant : ''} (${m.unit}) — stok gudang: ${Number(m.stock_qty) || 0}</option>`
+      `<option value="${m.id}" data-name="${m.name}" data-category="${m.category}" data-variant="${m.variant}" data-unit="${m.unit}">${m.name}${m.variant ? ' - ' + m.variant : ''} (${m.unit}) - stok gudang: ${Number(m.stock_qty) || 0}</option>`
     ).join('') + '</optgroup>';
   });
   select.innerHTML = html;
@@ -1788,6 +2922,9 @@ async function saveCurrentBon() {
   if (res.ok) {
     alert('Bon material berhasil disimpan.');
     await loadBonMaterials();
+    await loadMaterials();
+    renderMaterialsList();
+    renderMaterialStock();
     renderBonDetail(data.bon);
   } else {
     alert(data.message || 'Gagal menyimpan bon material.');
@@ -1910,6 +3047,291 @@ async function deleteMaterial(id) {
   }
 }
 
+// -------------------------------------------------------------
+// 11. BON REQUESTS (TELEGRAM / WEB QUEUE & APPROVAL)
+// -------------------------------------------------------------
+async function loadBonRequests() {
+  try {
+    const res = await fetch('/api/bon-requests');
+    bonRequestsData = await res.json();
+    renderBonPendingRequests();
+  } catch (err) {
+    console.error('Error loading bon requests:', err);
+  }
+}
+
+function renderBonPendingRequests() {
+  const container = document.getElementById('bon-pending-list');
+  const badge = document.getElementById('bon-pending-badge');
+  if (!container || !badge) return;
+
+  const pending = (bonRequestsData || []).filter(r => r.status === 'pending');
+  badge.textContent = pending.length;
+
+  if (pending.length === 0) {
+    container.innerHTML = `
+      <div class="p-4 rounded-lg bg-slate-50 border border-slate-200/80 text-center text-slate-400 text-xs">
+        <i data-lucide="check-circle" class="w-4 h-4 inline-block text-emerald-500 mr-1"></i>
+        Tidak ada request material yang menunggu persetujuan.
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+
+  const canApprove = currentUser && ['superadmin', 'pm'].includes(currentUser.role);
+
+  container.innerHTML = pending.map(r => {
+    const dateStr = r.created_at ? new Date(r.created_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '-';
+    const requester = r.requested_by_name || (r.requested_by_telegram_id ? `Telegram ID: ${r.requested_by_telegram_id}` : 'Teknisi');
+    const channelBadge = r.channel === 'telegram'
+      ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">Bot Telegram</span>'
+      : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">Web Dashboard</span>';
+
+    const itemsSummary = (r.items || []).map(it => `
+      <span class="inline-flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 rounded text-[11px] text-slate-700 font-medium">
+        <b>${it.name || it.material_id}</b>: ${it.qty} ${it.unit || 'unit'}
+      </span>
+    `).join(' ');
+
+    return `
+      <div class="p-3.5 rounded-xl border border-amber-200 bg-amber-50/40 hover:bg-amber-50/70 transition flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div class="space-y-1.5 flex-1 min-w-0">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-bold text-slate-900 text-xs">${r.wo_number}</span>
+            ${channelBadge}
+            <span class="text-[11px] text-slate-500">• Pemohon: <b class="text-slate-700">${requester}</b></span>
+            <span class="text-[11px] text-slate-400">• ${dateStr}</span>
+          </div>
+          <div class="flex flex-wrap gap-1.5 pt-1">
+            ${itemsSummary}
+          </div>
+          ${r.notes ? `<p class="text-[11px] text-slate-600 italic">Catatan: "${r.notes}"</p>` : ''}
+        </div>
+
+        <div class="flex items-center gap-2 shrink-0 self-end md:self-center">
+          ${canApprove ? `
+            <button onclick="approveBonRequestWeb('${r.id}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1 shadow cursor-pointer">
+              <i data-lucide="check" class="w-3.5 h-3.5"></i> Setujui
+            </button>
+            <button onclick="rejectBonRequestWeb('${r.id}')" class="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i> Tolak
+            </button>
+          ` : `
+            <span class="text-[11px] font-semibold text-amber-700 bg-amber-100/80 px-2.5 py-1 rounded-md">
+              Menunggu Approval PM
+            </span>
+          `}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  if (window.lucide) lucide.createIcons();
+}
+
+async function approveBonRequestWeb(reqId) {
+  if (!confirm('Setujui request material ini dan gabungkan item ke Bon Material WO?')) return;
+  try {
+    const res = await fetch(`/api/bon-requests/${reqId}/approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ approved_by: currentUser ? currentUser.name : 'PM Web' })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      alert('Request material berhasil disetujui dan digabungkan ke Bon WO.');
+      await Promise.all([loadBonRequests(), loadBonMaterials(), loadMaterials()]);
+      renderMaterialsList();
+      renderMaterialStock();
+      const currentProjId = document.getElementById('bon-wo-select')?.value;
+      if (currentProjId && data.bon && data.bon.project_id === currentProjId) {
+        renderBonDetail(data.bon);
+      }
+    } else {
+      alert(data.message || 'Gagal menyetujui request material.');
+    }
+  } catch (err) {
+    console.error('Error approving request:', err);
+    alert('Terjadi kesalahan saat menyetujui request.');
+  }
+}
+
+async function rejectBonRequestWeb(reqId) {
+  const reason = prompt('Masukkan alasan penolakan (opsional):', 'Stok tidak mencukupi atau salah spesifikasi');
+  if (reason === null) return;
+
+  try {
+    const res = await fetch(`/api/bon-requests/${reqId}/reject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      alert('Request material telah ditolak.');
+      await loadBonRequests();
+    } else {
+      alert(data.message || 'Gagal menolak request material.');
+    }
+  } catch (err) {
+    console.error('Error rejecting request:', err);
+    alert('Terjadi kesalahan saat menolak request.');
+  }
+}
+
+// -------------------------------------------------------------
+// 12. MATERIAL INBOUND (MATERIAL DATANG KE GUDANG)
+// -------------------------------------------------------------
+function populateInboundMaterialOptions() {
+  const select = document.getElementById('inb-modal-material');
+  if (!select) return;
+  const grouped = {};
+  materialsData.forEach(m => {
+    if (!grouped[m.category]) grouped[m.category] = [];
+    grouped[m.category].push(m);
+  });
+  let html = '<option value="">-- Pilih Material Datang --</option>';
+  Object.keys(grouped).forEach(cat => {
+    html += `<optgroup label="${cat}">` + grouped[cat].map(m =>
+      `<option value="${m.id}" data-name="${m.name}" data-unit="${m.unit}">${m.name}${m.variant ? ' - ' + m.variant : ''} (${m.unit}) - stok saat ini: ${Number(m.stock_qty) || 0}</option>`
+    ).join('') + '</optgroup>';
+  });
+  select.innerHTML = html;
+
+  const dateInput = document.getElementById('inb-modal-date');
+  if (dateInput && !dateInput.value) {
+    dateInput.value = new Date().toISOString().split('T')[0];
+  }
+}
+
+async function submitMaterialInbound(e) {
+  e.preventDefault();
+  const matSelect = document.getElementById('inb-modal-material');
+  const opt = matSelect.selectedOptions[0];
+  const qty = Number(document.getElementById('inb-modal-qty').value) || 0;
+  const arrDate = document.getElementById('inb-modal-date').value;
+  const supplier = document.getElementById('inb-modal-supplier').value.trim();
+  const notes = document.getElementById('inb-modal-notes').value.trim();
+
+  if (!opt || !opt.value) {
+    alert('Pilih material terlebih dahulu.');
+    return;
+  }
+  if (qty <= 0) {
+    alert('Jumlah material datang harus lebih dari 0.');
+    return;
+  }
+
+  const payload = {
+    material_id: opt.value,
+    qty_in: qty,
+    arrival_date: arrDate,
+    supplier_surat_jalan: supplier,
+    notes: notes,
+    recorded_by_name: currentUser ? currentUser.name : 'Web User'
+  };
+
+  try {
+    const res = await fetch('/api/material-inbounds', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (res.ok) {
+      closeModal('modalMaterialInbound');
+      document.getElementById('formMaterialInbound').reset();
+      alert(`Stok masuk berhasil dicatat. Stok ${data.material.name} sekarang: ${data.material.stock_qty} ${data.material.unit}`);
+      await loadMaterials();
+      renderMaterialsList();
+      populateBonItemMaterialOptions();
+      renderMaterialStock();
+    } else {
+      alert(data.message || 'Gagal mencatat material masuk.');
+    }
+  } catch (err) {
+    console.error('Error submitting material inbound:', err);
+    alert('Terjadi kesalahan saat mencatat material masuk.');
+  }
+}
+
+async function loadMaterialInbounds() {
+  const tbody = document.getElementById('inbound-history-tbody');
+  if (!tbody) return;
+  try {
+    const res = await fetch('/api/material-inbounds');
+    materialInboundsData = await res.json();
+    if (!res.ok) throw new Error(materialInboundsData.message || 'Gagal memuat riwayat');
+
+    if (materialInboundsData.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" class="p-6 text-center text-slate-400 text-xs">
+            Belum ada riwayat material datang.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    const canDelete = currentUser && ['superadmin', 'direktur'].includes(currentUser.role);
+
+    tbody.innerHTML = materialInboundsData.map(item => {
+      const dateStr = item.arrival_date || (item.created_at ? item.created_at.split('T')[0] : '-');
+      const recorder = item.recorded_by_name || (item.recorded_by_telegram_id ? `Telegram ID: ${item.recorded_by_telegram_id}` : '-');
+
+      return `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-medium text-slate-600 whitespace-nowrap">${dateStr}</td>
+          <td class="p-3 font-semibold text-slate-800">
+            ${item.material_name || item.material_id}
+            ${item.notes ? `<div class="text-[10px] text-slate-400 font-normal italic mt-0.5">${item.notes}</div>` : ''}
+          </td>
+          <td class="p-3 text-center whitespace-nowrap">
+            <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">
+              +${item.qty_in} ${item.unit || ''}
+            </span>
+          </td>
+          <td class="p-3 text-slate-600">${item.supplier_surat_jalan || '-'}</td>
+          <td class="p-3 text-slate-500 text-[11px]">${recorder}</td>
+          <td class="p-3 text-center whitespace-nowrap">
+            ${canDelete ? `
+              <button onclick="deleteMaterialInbound('${item.id}', '${item.material_name}')" class="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 cursor-pointer" title="Hapus (revert stok)">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            ` : '-'}
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    if (window.lucide) lucide.createIcons();
+  } catch (err) {
+    console.error('Error loading inbounds:', err);
+  }
+}
+
+async function deleteMaterialInbound(id, name) {
+  if (!confirm(`Hapus pencatatan material masuk untuk "${name}"? Stok gudang akan otomatis dikurangi kembali.`)) return;
+  try {
+    const res = await fetch(`/api/material-inbounds/${id}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    if (res.ok) {
+      await Promise.all([loadMaterials(), loadMaterialInbounds()]);
+      renderMaterialsList();
+      populateBonItemMaterialOptions();
+      renderMaterialStock();
+    } else {
+      alert(data.message || 'Gagal menghapus riwayat material masuk.');
+    }
+  } catch (err) {
+    console.error('Error deleting inbound:', err);
+  }
+}
+
 // --- Widget stok gudang di Executive Dashboard ---
 function renderMaterialStock() {
   const summary = document.getElementById('material-stock-summary');
@@ -1934,6 +3356,10 @@ function renderMaterialStock() {
     cats[c] = (cats[c] || 0) + (Number(m.stock_qty) || 0);
   });
   if (materialStockChartInstance) materialStockChartInstance.destroy();
+  const isDarkStock = isDarkMode();
+  const stockTextColor = isDarkStock ? '#cbd5e1' : '#64748b';
+  const stockGridColor = isDarkStock ? 'rgba(51, 65, 85, 0.45)' : 'rgba(226, 232, 240, 0.8)';
+
   materialStockChartInstance = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -1949,7 +3375,10 @@ function renderMaterialStock() {
       responsive: true,
       maintainAspectRatio: false,
       plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } }
+      scales: {
+        x: { ticks: { color: stockTextColor }, grid: { color: stockGridColor } },
+        y: { beginAtZero: true, ticks: { color: stockTextColor }, grid: { color: stockGridColor } }
+      }
     }
   });
 
@@ -1964,14 +3393,14 @@ function renderMaterialStock() {
         ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">Rendah</span>'
         : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">Aman</span>';
     return `
-      <div class="flex justify-between items-center p-2.5 rounded-lg border border-slate-100 bg-slate-50/50">
+      <div class="flex justify-between items-center p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/60">
         <div class="min-w-0">
-          <p class="text-xs font-semibold text-slate-800 truncate">${m.name}${m.variant ? ` <span class="text-slate-400">(${m.variant})</span>` : ''}</p>
-          <p class="text-[10px] text-slate-500">${m.category} • min ${min}</p>
+          <p class="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">${m.name}${m.variant ? ` <span class="text-slate-400">(${m.variant})</span>` : ''}</p>
+          <p class="text-[10px] text-slate-500 dark:text-slate-400">${m.category} • min ${min}</p>
         </div>
         <div class="flex items-center gap-2 shrink-0">
           ${badge}
-          <span class="text-xs font-bold text-slate-900 w-20 text-right">${stock} ${m.unit}</span>
+          <span class="text-xs font-bold text-slate-900 dark:text-slate-100 w-20 text-right">${stock} ${m.unit}</span>
         </div>
       </div>
     `;

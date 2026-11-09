@@ -4,5 +4,7 @@ deploy_siap_upload.zip
 *.py
 data/db.json
 .env
+.hermes/
+contoh invoice.png
 .DS_Store
 Thumbs.db

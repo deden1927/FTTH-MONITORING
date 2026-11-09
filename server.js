@@ -8,6 +8,24 @@ const jwt = require('jsonwebtoken');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
+// Load .env lightweight
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf8');
+  envContent.split('\n').forEach(line => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) return;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx !== -1) {
+      const k = trimmed.slice(0, eqIdx).trim();
+      const v = trimmed.slice(eqIdx + 1).trim();
+      if (!process.env[k]) process.env[k] = v;
+    }
+  });
+}
+
+const TelegramBotService = require('./telegram-bot');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DB_FILE = process.env.DB_FILE || path.join(__dirname, 'data', 'db.json');
@@ -63,15 +81,71 @@ app.use(express.static(path.join(__dirname, 'public')));
 // 3. DATABASE HELPER (SAFE ATOMIC I/O)
 // -------------------------------------------------------------
 function readDB() {
+  const emptyDB = {
+    sp_orders: [],
+    projects: [],
+    executors: [],
+    milestones: [],
+    invoices: [],
+    mandor_payouts: [],
+    gallery: [],
+    users: [],
+    materials: [],
+    bon_material: [],
+    telegram_users: [],
+    bon_requests: [],
+    material_inbounds: []
+  };
   try {
     if (!fs.existsSync(DB_FILE)) {
-      return { projects: [], executors: [], milestones: [], invoices: [], mandor_payouts: [], gallery: [], users: [] };
+      return emptyDB;
     }
     const raw = fs.readFileSync(DB_FILE, 'utf8');
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed.sp_orders)) parsed.sp_orders = [];
+    if (!Array.isArray(parsed.projects)) parsed.projects = [];
+    if (!Array.isArray(parsed.telegram_users)) parsed.telegram_users = [];
+    if (!Array.isArray(parsed.bon_requests)) parsed.bon_requests = [];
+    if (!Array.isArray(parsed.material_inbounds)) parsed.material_inbounds = [];
+    if (!Array.isArray(parsed.materials)) parsed.materials = [];
+    if (!Array.isArray(parsed.bon_material)) parsed.bon_material = [];
+
+    // Auto-normalisasi data projects ke dalam relasi SP/PO (1 SP to N Pekerjaan)
+    let needSync = false;
+    parsed.projects.forEach(p => {
+      const spNum = p.sp_number || p.wo_number || 'SP-UNKNOWN';
+      const jobName = p.job_name || p.cluster_name || p.wo_number || 'Pekerjaan Lapangan';
+      if (!p.sp_number) { p.sp_number = spNum; needSync = true; }
+      if (!p.job_name) { p.job_name = jobName; needSync = true; }
+      if (!p.cluster_name) { p.cluster_name = jobName; needSync = true; }
+      if (!p.wo_number) { p.wo_number = spNum; needSync = true; }
+
+      let existingSp = parsed.sp_orders.find(s => (s.sp_number || '').trim().toLowerCase() === spNum.trim().toLowerCase());
+      if (!existingSp) {
+        existingSp = {
+          id: 'sp-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+          sp_number: spNum,
+          client_name: p.client_name || 'Telkom Akses',
+          created_at: p.created_at || new Date().toISOString().split('T')[0],
+          notes: ''
+        };
+        parsed.sp_orders.push(existingSp);
+        needSync = true;
+      }
+      if (!p.sp_id) {
+        p.sp_id = existingSp.id;
+        needSync = true;
+      }
+    });
+
+    if (needSync && fs.existsSync(DB_FILE)) {
+      writeDB(parsed);
+    }
+
+    return parsed;
   } catch (err) {
     console.error('Error reading database:', err.message);
-    return { projects: [], executors: [], milestones: [], invoices: [], mandor_payouts: [], gallery: [], users: [] };
+    return emptyDB;
   }
 }
 
@@ -89,6 +163,13 @@ function writeDB(data) {
     return false;
   }
 }
+
+// Telegram Bot Service Instance
+const telegramBot = new TelegramBotService({
+  token: process.env.TELEGRAM_BOT_TOKEN,
+  readDB,
+  writeDB
+});
 
 // -------------------------------------------------------------
 // 4. SECURITY HELPERS (PASSWORD, SANITIZATION, AUTH)
@@ -261,31 +342,76 @@ app.get('/api/dashboard/stats', authenticateToken, (req, res) => {
   // 1. Total Pekerjaan Berjalan (Order Book)
   const totalOrderBook = (db.projects || []).reduce((acc, p) => acc + (p.contract_value || 0), 0);
 
-  // 2. Total Kas Diterima YTD (dari invoice berstatus 'Lunas')
+  // 2. Total Kas Diterima YTD (dari invoice berstatus 'Lunas' atau 'Sudah Cashbank')
   const totalKasDiterima = (db.invoices || [])
-    .filter(inv => inv.status === 'Lunas')
+    .filter(inv => inv.status === 'Lunas' || inv.status === 'Sudah Cashbank')
     .reduce((acc, inv) => acc + (inv.amount || 0), 0);
 
-  // 3. Total Sisa Piutang Klien (invoice yang belum 'Lunas')
+  // 3. Total Sisa Piutang Klien (invoice yang belum cashbank)
   const totalSisaPiutang = (db.invoices || [])
-    .filter(inv => inv.status !== 'Lunas')
+    .filter(inv => inv.status !== 'Lunas' && inv.status !== 'Sudah Cashbank')
     .reduce((acc, inv) => acc + (inv.amount || 0), 0);
 
-  // 4. Estimasi Laba Kotor Perusahaan
+  // 4. Estimasi Laba Bersih Perusahaan
   const totalRevenue = totalOrderBook;
   const totalHPP = (db.projects || []).reduce((acc, p) => acc + (p.mandor_cost || 0), 0);
   const totalGrossMargin = totalRevenue - totalHPP;
   const grossMarginPercent = totalRevenue > 0 ? ((totalGrossMargin / totalRevenue) * 100).toFixed(1) : 0;
 
-  // Monthly Revenue Trend
-  const monthlyRevenue = [
-    { month: 'Mei', billed: 450000000, received: 400000000 },
-    { month: 'Jun', billed: 620000000, received: 550000000 },
-    { month: 'Jul', billed: 780000000, received: 710000000 },
-    { month: 'Agt', billed: 950000000, received: 850000000 },
-    { month: 'Sep', billed: 1250000000, received: 980000000 },
-    { month: 'Okt (Proj)', billed: 1450000000, received: 1100000000 }
-  ];
+  // Monthly Revenue Trend (Dynamic kalkulasi dari db.invoices)
+  const now = new Date();
+  let maxYear = now.getFullYear();
+  let maxMonth = now.getMonth();
+
+  (db.invoices || []).forEach(inv => {
+    [inv.invoice_date, inv.paid_date].forEach(dStr => {
+      if (dStr && /^\d{4}-\d{2}/.test(dStr)) {
+        const parts = dStr.split('-');
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        if (y > maxYear || (y === maxYear && m > maxMonth)) {
+          maxYear = y;
+          maxMonth = m;
+        }
+      }
+    });
+  });
+
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+  const monthlyRevenue = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(maxYear, maxMonth - i, 1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const key = `${yyyy}-${mm}`;
+    const monthLabel = monthNames[d.getMonth()];
+
+    // Omset Tagihan (Billed): invoice yang diterbitkan pada bulan tersebut (kecuali Draft)
+    const billed = (db.invoices || [])
+      .filter(inv => {
+        if (inv.status === 'Draft') return false;
+        const dt = inv.invoice_date || '';
+        return dt.startsWith(key);
+      })
+      .reduce((sum, inv) => sum + (Number(inv.amount) || 0), 0);
+
+    // Kas Riil Masuk (Received): invoice lunas/cashbank pada bulan uang masuk (paid_date)
+    const received = (db.invoices || [])
+      .filter(inv => {
+        const isPaid = inv.status === 'Sudah Cashbank' || inv.status === 'Lunas';
+        if (!isPaid) return false;
+        const dt = inv.paid_date || inv.invoice_date || '';
+        return dt.startsWith(key);
+      })
+      .reduce((sum, inv) => sum + (Number(inv.amount) || 0), 0);
+
+    monthlyRevenue.push({
+      month: monthLabel,
+      key,
+      billed,
+      received
+    });
+  }
 
   // Portofolio Klien
   const clientPortfolio = {};
@@ -324,7 +450,80 @@ app.get('/api/dashboard/stats', authenticateToken, (req, res) => {
 });
 
 // -------------------------------------------------------------
-// 8. PROJECTS (WORK ORDERS) API
+// 8. SP & PURCHASE ORDERS API
+// -------------------------------------------------------------
+app.get('/api/sp-orders', authenticateToken, (req, res) => {
+  const db = readDB();
+  const list = (db.sp_orders || []).map(sp => {
+    const jobs = (db.projects || []).filter(p => p.sp_id === sp.id || (p.sp_number && p.sp_number.toLowerCase() === sp.sp_number.toLowerCase()) || p.wo_number === sp.sp_number);
+    const totalBOQ = jobs.reduce((sum, j) => sum + (Number(j.contract_value) || 0), 0);
+    const totalHPP = jobs.reduce((sum, j) => sum + (Number(j.mandor_cost) || 0), 0);
+    const totalMargin = totalBOQ - totalHPP;
+    const marginPct = totalBOQ > 0 ? Number(((totalMargin / totalBOQ) * 100).toFixed(1)) : 0;
+
+    return {
+      ...sp,
+      total_boq: totalBOQ,
+      total_hpp: totalHPP,
+      gross_margin: totalMargin,
+      margin_percent: marginPct,
+      job_count: jobs.length,
+      jobs
+    };
+  });
+  res.json(list);
+});
+
+app.post('/api/sp-orders', authenticateToken, requireRoles(['direktur', 'superadmin', 'pm']), (req, res) => {
+  const db = readDB();
+  const { sp_number, client_name, notes } = req.body;
+  const trimmedSp = String(sp_number || '').trim();
+  const trimmedClient = String(client_name || '').trim();
+  if (!trimmedSp || !trimmedClient) {
+    return res.status(400).json({ success: false, message: 'Nomor SP/PO dan Klien wajib diisi!' });
+  }
+
+  if (!Array.isArray(db.sp_orders)) db.sp_orders = [];
+  const existing = db.sp_orders.find(s => s.sp_number.toLowerCase() === trimmedSp.toLowerCase());
+  if (existing) {
+    return res.status(409).json({ success: false, message: 'Nomor SP/PO sudah terdaftar!' });
+  }
+
+  const newSp = {
+    id: 'sp-' + Date.now(),
+    sp_number: trimmedSp,
+    client_name: trimmedClient,
+    created_at: new Date().toISOString().split('T')[0],
+    notes: String(notes || '').trim()
+  };
+  db.sp_orders.push(newSp);
+  writeDB(db);
+  res.status(201).json({ success: true, message: 'SP/PO berhasil didaftarkan.', sp: newSp });
+});
+
+app.delete('/api/sp-orders/:id', authenticateToken, requireRoles(['direktur', 'superadmin']), (req, res) => {
+  const db = readDB();
+  const spIndex = (db.sp_orders || []).findIndex(s => s.id === req.params.id);
+  if (spIndex === -1) return res.status(404).json({ success: false, message: 'SP/PO tidak ditemukan.' });
+
+  const sp = db.sp_orders[spIndex];
+  const relatedJobs = (db.projects || []).filter(p => p.sp_id === sp.id || (p.sp_number && p.sp_number.toLowerCase() === sp.sp_number.toLowerCase()) || p.wo_number === sp.sp_number);
+  const activeJobs = relatedJobs.filter(p => p.status !== 'Selesai' && p.status !== 'Done');
+
+  if (activeJobs.length > 0) {
+    return res.status(400).json({
+      success: false,
+      message: `Tidak dapat menghapus SP/PO "${sp.sp_number}" karena masih memiliki ${activeJobs.length} pekerjaan yang belum selesai.`
+    });
+  }
+
+  const [removedSp] = db.sp_orders.splice(spIndex, 1);
+  writeDB(db);
+  res.json({ success: true, message: 'SP/PO berhasil dihapus.', sp: removedSp });
+});
+
+// -------------------------------------------------------------
+// 8B. PROJECTS (PEKERJAAN / WORK ORDERS) API
 // -------------------------------------------------------------
 app.get('/api/projects', authenticateToken, (req, res) => {
   const db = readDB();
@@ -360,8 +559,10 @@ app.post('/api/projects', authenticateToken, requireRoles(['direktur', 'superadm
   const db = readDB();
   const {
     wo_number,
+    sp_number,
     client_name,
     cluster_name,
+    job_name,
     executor_type,
     executor_id,
     contract_value,
@@ -369,8 +570,26 @@ app.post('/api/projects', authenticateToken, requireRoles(['direktur', 'superadm
     target_date
   } = req.body;
 
-  if (!wo_number || !client_name) {
-    return res.status(400).json({ error: 'Nomor WO dan Klien wajib diisi!' });
+  const rawSp = String(sp_number || wo_number || '').trim();
+  const rawJob = String(job_name || cluster_name || rawSp).trim();
+  const rawClient = String(client_name || '').trim();
+
+  if (!rawSp || !rawClient) {
+    return res.status(400).json({ error: 'Nomor SP/PO dan Klien wajib diisi!' });
+  }
+
+  // Cari atau buat SP di sp_orders
+  if (!Array.isArray(db.sp_orders)) db.sp_orders = [];
+  let spOrder = db.sp_orders.find(s => (s.sp_number || '').trim().toLowerCase() === rawSp.toLowerCase());
+  if (!spOrder) {
+    spOrder = {
+      id: 'sp-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+      sp_number: rawSp,
+      client_name: rawClient,
+      created_at: new Date().toISOString().split('T')[0],
+      notes: ''
+    };
+    db.sp_orders.push(spOrder);
   }
 
   const executor = (db.executors || []).find(e => e.id === executor_id) || { name: 'Belum Ditentukan' };
@@ -382,9 +601,12 @@ app.post('/api/projects', authenticateToken, requireRoles(['direktur', 'superadm
   const newProjId = 'proj-' + (Date.now());
   const newProject = {
     id: newProjId,
-    wo_number: String(wo_number).trim(),
-    client_name: String(client_name).trim(),
-    cluster_name: String(cluster_name || '').trim(),
+    sp_id: spOrder.id,
+    sp_number: spOrder.sp_number,
+    job_name: rawJob,
+    wo_number: spOrder.sp_number, // Backward compatibility
+    cluster_name: rawJob,         // Backward compatibility
+    client_name: spOrder.client_name,
     executor_type: executor_type || 'Mandor',
     executor_id: executor_id || '',
     executor_name: executor.name,
@@ -551,16 +773,31 @@ app.post('/api/invoices', authenticateToken, requireRoles(['finance', 'superadmi
   const db = readDB();
   if (!db.invoices) db.invoices = [];
 
+  const invoiceDate = req.body.invoice_date || new Date().toISOString().split('T')[0];
+  let dueDate = req.body.due_date;
+  if (!dueDate && invoiceDate) {
+    const d = new Date(invoiceDate);
+    d.setMonth(d.getMonth() + 2);
+    dueDate = d.toISOString().split('T')[0];
+  }
+
+  const rawId = req.body.id ? String(req.body.id).trim() : '';
+  const invId = rawId || ('inv-' + Date.now());
+
+  if (rawId && (db.invoices || []).some(inv => inv.id.toLowerCase() === rawId.toLowerCase())) {
+    return res.status(409).json({ success: false, message: `ID Invoice "${rawId}" sudah terdaftar!` });
+  }
+
   const newInv = {
-    id: 'inv-' + Date.now(),
+    id: invId,
     project_id: req.body.project_id,
     wo_number: String(req.body.wo_number || '').trim(),
     client_name: String(req.body.client_name || '').trim(),
     term_name: String(req.body.term_name || '').trim(),
     amount: Number(req.body.amount) || 0,
-    status: req.body.status || 'Draft',
-    invoice_date: req.body.invoice_date || new Date().toISOString().split('T')[0],
-    due_date: req.body.due_date || '',
+    status: req.body.status || 'Belum Cashbank',
+    invoice_date: invoiceDate,
+    due_date: dueDate,
     paid_date: '',
     aging_category: '0 - 30 Hari'
   };
@@ -570,19 +807,58 @@ app.post('/api/invoices', authenticateToken, requireRoles(['finance', 'superadmi
   res.status(201).json(newInv);
 });
 
-app.put('/api/invoices/:id/status', authenticateToken, requireRoles(['finance', 'superadmin']), (req, res) => {
+app.put(/^\/api\/invoices\/(.+)\/status$/, authenticateToken, requireRoles(['finance', 'superadmin']), (req, res) => {
   const db = readDB();
-  const idx = (db.invoices || []).findIndex(inv => inv.id === req.params.id);
+  const targetId = req.params[0] ? decodeURIComponent(req.params[0]) : req.params.id;
+  const idx = (db.invoices || []).findIndex(inv => inv.id === targetId || inv.id === decodeURIComponent(targetId));
   if (idx === -1) return res.status(404).json({ error: 'Invoice not found' });
 
   const { status, paid_date } = req.body;
   db.invoices[idx].status = status;
-  if (status === 'Lunas') {
+  if (status === 'Lunas' || status === 'Sudah Cashbank') {
     db.invoices[idx].paid_date = paid_date || new Date().toISOString().split('T')[0];
     db.invoices[idx].aging_category = 'Lunas';
   }
   writeDB(db);
   res.json(db.invoices[idx]);
+});
+
+app.put(/^\/api\/invoices\/(?!.*\/status$)(.+)$/, authenticateToken, requireRoles(['finance', 'superadmin', 'direktur']), (req, res) => {
+  const db = readDB();
+  const targetId = req.params[0] ? decodeURIComponent(req.params[0]) : req.params.id;
+  const idx = (db.invoices || []).findIndex(inv => inv.id === targetId || inv.id === decodeURIComponent(targetId));
+  if (idx === -1) return res.status(404).json({ success: false, message: 'Invoice tidak ditemukan.' });
+
+  const { wo_number, client_name, term_name, amount, status, invoice_date, due_date, paid_date } = req.body;
+  if (wo_number !== undefined) db.invoices[idx].wo_number = String(wo_number).trim();
+  if (client_name !== undefined) db.invoices[idx].client_name = String(client_name).trim();
+  if (term_name !== undefined) db.invoices[idx].term_name = String(term_name).trim();
+  if (amount !== undefined) db.invoices[idx].amount = Number(amount) || 0;
+  if (invoice_date !== undefined) db.invoices[idx].invoice_date = invoice_date;
+  if (due_date !== undefined) db.invoices[idx].due_date = due_date;
+  if (status !== undefined) {
+    db.invoices[idx].status = status;
+    if (status === 'Lunas' || status === 'Sudah Cashbank') {
+      db.invoices[idx].paid_date = paid_date || new Date().toISOString().split('T')[0];
+      db.invoices[idx].aging_category = 'Lunas';
+    } else {
+      db.invoices[idx].aging_category = '0 - 30 Hari';
+    }
+  }
+
+  writeDB(db);
+  res.json({ success: true, message: 'Invoice berhasil diperbarui.', invoice: db.invoices[idx] });
+});
+
+app.delete(/^\/api\/invoices\/(.+)$/, authenticateToken, requireRoles(['finance', 'superadmin', 'direktur']), (req, res) => {
+  const db = readDB();
+  const targetId = req.params[0] ? decodeURIComponent(req.params[0]) : req.params.id;
+  const idx = (db.invoices || []).findIndex(inv => inv.id === targetId || inv.id === decodeURIComponent(targetId));
+  if (idx === -1) return res.status(404).json({ success: false, message: 'Invoice tidak ditemukan.' });
+
+  const [removed] = db.invoices.splice(idx, 1);
+  writeDB(db);
+  res.json({ success: true, message: 'Invoice berhasil dihapus.', invoice: removed });
 });
 
 // -------------------------------------------------------------
@@ -591,6 +867,64 @@ app.put('/api/invoices/:id/status', authenticateToken, requireRoles(['finance', 
 app.get('/api/mandor-payouts', authenticateToken, (req, res) => {
   const db = readDB();
   res.json(db.mandor_payouts || []);
+});
+
+app.post('/api/mandor-payouts', authenticateToken, requireRoles(['pm', 'finance', 'superadmin', 'direktur']), (req, res) => {
+  const db = readDB();
+  if (!db.mandor_payouts) db.mandor_payouts = [];
+
+  const { project_id, mandor_name, milestone_stage, amount, notes, verified_by_pm } = req.body;
+  const trimmedMandor = String(mandor_name || '').trim();
+  const trimmedStage = String(milestone_stage || 'Operasional Lapangan').trim();
+  const numAmount = Number(amount) || 0;
+
+  if (!trimmedMandor || numAmount <= 0) {
+    return res.status(400).json({ success: false, message: 'Nama Mandor dan Nominal Upah valid wajib diisi!' });
+  }
+
+  const isVerified = verified_by_pm === true || ['pm', 'superadmin', 'direktur'].includes(req.user.role);
+  const newPayout = {
+    id: 'pay-' + Date.now(),
+    project_id: String(project_id || 'manual').trim(),
+    mandor_name: trimmedMandor,
+    milestone_stage: trimmedStage,
+    amount: numAmount,
+    status: isVerified ? 'Disetujui PM' : 'Pending Verifikasi',
+    verified_by_pm: isVerified,
+    payout_date: '',
+    notes: String(notes || '').trim(),
+    created_at: new Date().toISOString().split('T')[0]
+  };
+
+  db.mandor_payouts.push(newPayout);
+  writeDB(db);
+  res.status(201).json({ success: true, message: 'Klaim kas keluar berhasil dicatat.', payout: newPayout });
+});
+
+app.put('/api/mandor-payouts/:id', authenticateToken, requireRoles(['pm', 'finance', 'superadmin', 'direktur']), (req, res) => {
+  const db = readDB();
+  const idx = (db.mandor_payouts || []).findIndex(p => p.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ success: false, message: 'Klaim kas keluar tidak ditemukan.' });
+
+  const { mandor_name, milestone_stage, amount, notes, status } = req.body;
+  if (mandor_name !== undefined) db.mandor_payouts[idx].mandor_name = String(mandor_name).trim();
+  if (milestone_stage !== undefined) db.mandor_payouts[idx].milestone_stage = String(milestone_stage).trim();
+  if (amount !== undefined) db.mandor_payouts[idx].amount = Number(amount) || 0;
+  if (notes !== undefined) db.mandor_payouts[idx].notes = String(notes).trim();
+  if (status !== undefined) db.mandor_payouts[idx].status = String(status).trim();
+
+  writeDB(db);
+  res.json({ success: true, message: 'Data kas keluar berhasil diperbarui.', payout: db.mandor_payouts[idx] });
+});
+
+app.delete('/api/mandor-payouts/:id', authenticateToken, requireRoles(['pm', 'finance', 'superadmin', 'direktur']), (req, res) => {
+  const db = readDB();
+  const idx = (db.mandor_payouts || []).findIndex(p => p.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ success: false, message: 'Klaim kas keluar tidak ditemukan.' });
+
+  const [removed] = db.mandor_payouts.splice(idx, 1);
+  writeDB(db);
+  res.json({ success: true, message: 'Data kas keluar berhasil dihapus.', payout: removed });
 });
 
 app.put('/api/mandor-payouts/:id/verify', authenticateToken, requireRoles(['pm', 'superadmin', 'direktur']), (req, res) => {
@@ -642,35 +976,52 @@ app.put('/api/executors/:id', authenticateToken, requireRoles(['direktur', 'supe
   if (index === -1) return res.status(404).json({ success: false, message: 'Eksekutor tidak ditemukan.' });
 
   // Whitelisting field to prevent mass assignment
-  const { name, phone, pic, wilayah, specialization, rating, active_wos } = req.body;
-  if (name !== undefined) db.executors[index].name = String(name).trim();
+  const { name, type, phone, pic, wilayah, specialization, fleet_no, standard_rates, status, rating, active_wos } = req.body;
+  if (name !== undefined) {
+    const trimmed = String(name).trim();
+    if (trimmed) {
+      db.executors[index].name = trimmed;
+      (db.projects || []).forEach(p => {
+        if (p.executor_id === id) {
+          p.executor_name = trimmed;
+        }
+      });
+    }
+  }
+  if (type !== undefined && ['Internal', 'Mandor'].includes(type)) db.executors[index].type = type;
   if (phone !== undefined) db.executors[index].phone = String(phone).trim();
   if (pic !== undefined) db.executors[index].pic = String(pic).trim();
   if (wilayah !== undefined) db.executors[index].wilayah = String(wilayah).trim();
   if (specialization !== undefined) db.executors[index].specialization = String(specialization).trim();
-  if (rating !== undefined) db.executors[index].rating = Number(rating);
-  if (active_wos !== undefined) db.executors[index].active_wos = Number(active_wos);
+  if (fleet_no !== undefined) db.executors[index].fleet_no = String(fleet_no).trim();
+  if (standard_rates !== undefined) db.executors[index].standard_rates = String(standard_rates).trim();
+  if (status !== undefined) db.executors[index].status = String(status).trim();
+  if (rating !== undefined) db.executors[index].rating = Number(rating) || 5.0;
+  if (active_wos !== undefined) db.executors[index].active_wos = Number(active_wos) || 0;
 
   writeDB(db);
-  res.json({ success: true, message: 'Eksekutor berhasil diupdate.' });
+  res.json({ success: true, message: 'Eksekutor berhasil diupdate.', executor: db.executors[index] });
 });
 
 app.post('/api/executors', authenticateToken, requireRoles(['direktur', 'superadmin', 'pm']), (req, res) => {
   const db = readDB();
   if (!db.executors) db.executors = [];
 
-  const { name, type, phone, pic, wilayah, specialization } = req.body;
-  if (!name) return res.status(400).json({ success: false, message: 'Nama eksekutor wajib diisi!' });
+  const { name, type, phone, pic, wilayah, specialization, fleet_no, standard_rates, status, rating } = req.body;
+  if (!name || !String(name).trim()) return res.status(400).json({ success: false, message: 'Nama eksekutor wajib diisi!' });
 
   const newExec = {
     id: 'exec-' + Date.now(),
     name: String(name).trim(),
-    type: type || 'Mandor',
+    type: ['Internal', 'Mandor'].includes(type) ? type : 'Mandor',
     phone: String(phone || '').trim(),
     pic: String(pic || '').trim(),
     wilayah: String(wilayah || '').trim(),
     specialization: String(specialization || 'FTTH OSP').trim(),
-    rating: 5.0,
+    fleet_no: String(fleet_no || '').trim(),
+    standard_rates: String(standard_rates || '').trim(),
+    status: status || 'Aktif',
+    rating: Number(rating) || 5.0,
     active_wos: 0
   };
 
@@ -679,12 +1030,37 @@ app.post('/api/executors', authenticateToken, requireRoles(['direktur', 'superad
   res.status(201).json({ success: true, message: 'Eksekutor berhasil ditambahkan.', executor: newExec });
 });
 
+app.delete('/api/executors/:id', authenticateToken, requireRoles(['direktur', 'superadmin']), (req, res) => {
+  const db = readDB();
+  const id = req.params.id;
+  const index = (db.executors || []).findIndex(e => e.id === id);
+  if (index === -1) return res.status(404).json({ success: false, message: 'Eksekutor tidak ditemukan.' });
+
+  const executor = db.executors[index];
+  const activeProjects = (db.projects || []).filter(p =>
+    (p.executor_id === id || p.executor_name === executor.name) &&
+    p.status !== 'Selesai' && p.status !== 'Done'
+  );
+
+  if (activeProjects.length > 0) {
+    const activeWoList = activeProjects.map(p => p.wo_number).join(', ');
+    return res.status(400).json({
+      success: false,
+      message: `Tidak dapat menghapus eksekutor "${executor.name}" karena masih memiliki ${activeProjects.length} WO aktif (${activeWoList}). Alihkan atau selesaikan WO tersebut terlebih dahulu.`
+    });
+  }
+
+  const [removed] = db.executors.splice(index, 1);
+  writeDB(db);
+  res.json({ success: true, message: 'Eksekutor berhasil dihapus.', executor: removed });
+});
+
 // -------------------------------------------------------------
 // 14. EXPORT CSV APIS (SECURED AGAINST FORMULA INJECTION)
 // -------------------------------------------------------------
 app.get('/api/export/projects-csv', authenticateToken, (req, res) => {
   const db = readDB();
-  let csv = 'ID,Nomor WO/SP,Klien,Klaster/Area,Tipe Eksekutor,Nama Eksekutor,Nilai Kontrak (Rp),HPP Mandor (Rp),Gross Margin (Rp),Margin (%),Status,Target Selesai\n';
+  let csv = 'ID,Nomor WO/SP,Klien,Klaster/Area,Tipe Eksekutor,Nama Eksekutor,Nilai Kontrak (Rp),HPP Mandor (Rp),Net Margin (Rp),Margin (%),Status,Target Selesai\n';
   (db.projects || []).forEach(p => {
     csv += [
       sanitizeCSV(p.id),
@@ -1054,7 +1430,31 @@ app.put('/api/bon-material/:id', authenticateToken, requireRoles(['direktur', 's
   if (status !== undefined && ['Draft', 'Disetujui', 'Selesai'].includes(status)) bon.status = status;
   if (notes !== undefined) bon.notes = String(notes).trim();
   if (Array.isArray(items)) {
-    bon.items = items.map(sanitizeBonItem);
+    // Pengurangan stok gudang manual berdasarkan realisasi terpasang di lapangan (qty_used)
+    const oldItemsMap = new Map();
+    (bon.items || []).forEach(it => {
+      const key = it.material_id || it.id;
+      oldItemsMap.set(key, Number(it.qty_used) || 0);
+    });
+
+    const sanitized = items.map(sanitizeBonItem);
+
+    if (!Array.isArray(db.materials)) db.materials = [];
+    sanitized.forEach(newItem => {
+      const key = newItem.material_id || newItem.id;
+      const oldUsed = oldItemsMap.get(key) || 0;
+      const newUsed = Number(newItem.qty_used) || 0;
+      const deltaUsed = newUsed - oldUsed;
+
+      if (deltaUsed !== 0 && newItem.material_id) {
+        const matIdx = db.materials.findIndex(m => m.id === newItem.material_id);
+        if (matIdx !== -1) {
+          db.materials[matIdx].stock_qty = Math.max(0, (Number(db.materials[matIdx].stock_qty) || 0) - deltaUsed);
+        }
+      }
+    });
+
+    bon.items = sanitized;
   }
   bon.updated_at = new Date().toISOString().split('T')[0];
   writeDB(db);
@@ -1071,7 +1471,198 @@ app.delete('/api/bon-material/:id', authenticateToken, requireRoles(['direktur',
 });
 
 // -------------------------------------------------------------
-// 17. GLOBAL ERROR HANDLER
+// 17. MATERIAL INBOUNDS (MATERIAL DATANG KE GUDANG)
+// -------------------------------------------------------------
+app.get('/api/material-inbounds', authenticateToken, (req, res) => {
+  const db = readDB();
+  res.json(db.material_inbounds || []);
+});
+
+app.post('/api/material-inbounds', authenticateToken, requireRoles(['direktur', 'superadmin', 'pm', 'admin']), (req, res) => {
+  const db = readDB();
+  const { material_id, qty, supplier, received_date, notes } = req.body;
+  const numQty = parseInt(qty, 10);
+  if (!material_id || isNaN(numQty) || numQty <= 0) {
+    return res.status(400).json({ success: false, message: 'Material dan jumlah valid (>0) wajib diisi!' });
+  }
+
+  const mat = (db.materials || []).find(m => m.id === material_id);
+  if (!mat) {
+    return res.status(404).json({ success: false, message: 'Material tidak ditemukan di master data.' });
+  }
+
+  const newInbound = {
+    id: 'inb-' + Date.now(),
+    material_id: mat.id,
+    material_name: mat.name,
+    category: mat.category,
+    variant: mat.variant || '',
+    unit: mat.unit || 'pcs',
+    qty: numQty,
+    supplier: String(supplier || '').trim(),
+    notes: String(notes || '').trim(),
+    received_date: received_date || new Date().toISOString().split('T')[0],
+    created_by: req.user ? req.user.name : 'User',
+    created_at: new Date().toISOString()
+  };
+
+  if (!Array.isArray(db.material_inbounds)) db.material_inbounds = [];
+  db.material_inbounds.push(newInbound);
+
+  // Otomatis menambah stok gudang
+  mat.stock_qty = (Number(mat.stock_qty) || 0) + numQty;
+
+  writeDB(db);
+  res.status(201).json({ success: true, message: 'Material datang berhasil dicatat, stok gudang bertambah.', inbound: newInbound });
+});
+
+app.delete('/api/material-inbounds/:id', authenticateToken, requireRoles(['direktur', 'superadmin']), (req, res) => {
+  const db = readDB();
+  const idx = (db.material_inbounds || []).findIndex(i => i.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ success: false, message: 'Catatan material datang tidak ditemukan.' });
+
+  const [removed] = db.material_inbounds.splice(idx, 1);
+  // Revert stok gudang
+  const mat = (db.materials || []).find(m => m.id === removed.material_id);
+  if (mat) {
+    mat.stock_qty = Math.max(0, (Number(mat.stock_qty) || 0) - Number(removed.qty || 0));
+  }
+
+  writeDB(db);
+  res.json({ success: true, message: 'Catatan material datang dihapus dan stok dikoreksi.', removed });
+});
+
+// -------------------------------------------------------------
+// 18. BON REQUESTS & APPROVAL (INTEGRASI BOT TELEGRAM)
+// -------------------------------------------------------------
+app.get('/api/bon-requests', authenticateToken, (req, res) => {
+  const db = readDB();
+  let list = db.bon_requests || [];
+  if (req.query.project_id) {
+    list = list.filter(r => r.project_id === req.query.project_id);
+  }
+  if (req.query.status) {
+    list = list.filter(r => r.status === req.query.status);
+  }
+  res.json(list);
+});
+
+app.post('/api/bon-requests', authenticateToken, (req, res) => {
+  const db = readDB();
+  const { project_id, items, notes } = req.body;
+  const project = (db.projects || []).find(p => p.id === project_id);
+  if (!project) return res.status(404).json({ success: false, message: 'Work Order tidak ditemukan.' });
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ success: false, message: 'Minimal sertakan 1 item material!' });
+  }
+
+  const newRequest = {
+    id: 'req-' + Date.now(),
+    project_id: project.id,
+    wo_number: project.wo_number,
+    client_name: project.client_name,
+    cluster_name: project.cluster_name,
+    items: items.map(it => ({
+      material_id: it.material_id || '',
+      name: String(it.name || '').trim(),
+      category: String(it.category || 'Lainnya'),
+      variant: String(it.variant || ''),
+      unit: String(it.unit || 'pcs'),
+      qty_planned: Number(it.qty_planned) || 0
+    })),
+    notes: String(notes || '').trim(),
+    status: 'Pending',
+    requested_by_tg_id: req.user && req.user.telegram_id ? String(req.user.telegram_id) : '',
+    requested_by_name: req.user ? req.user.name : 'User Web',
+    requested_by_role: req.user ? req.user.role : 'teknisi',
+    created_at: new Date().toISOString().split('T')[0],
+    updated_at: new Date().toISOString()
+  };
+
+  if (!Array.isArray(db.bon_requests)) db.bon_requests = [];
+  db.bon_requests.push(newRequest);
+  writeDB(db);
+
+  if (telegramBot) {
+    telegramBot.notifyPMNewBonRequest(newRequest).catch(() => {});
+  }
+
+  res.status(201).json({ success: true, message: 'Request bon material berhasil diajukan (status Pending).', request: newRequest });
+});
+
+app.post('/api/bon-requests/:id/approve', authenticateToken, requireRoles(['direktur', 'superadmin', 'pm']), async (req, res) => {
+  const approverName = req.user ? req.user.name : 'Project Manager';
+  const result = await telegramBot.approveBonRequest(req.params.id, approverName);
+  if (!result.success) {
+    return res.status(400).json(result);
+  }
+  res.json({ success: true, message: 'Request bon material berhasil disetujui.', request: result.request, bon: result.bon });
+});
+
+app.post('/api/bon-requests/:id/reject', authenticateToken, requireRoles(['direktur', 'superadmin', 'pm']), async (req, res) => {
+  const rejectorName = req.user ? req.user.name : 'Project Manager';
+  const reason = req.body && req.body.reason ? String(req.body.reason).trim() : 'Tidak disetujui oleh PM';
+  const result = await telegramBot.rejectBonRequest(req.params.id, rejectorName, reason);
+  if (!result.success) {
+    return res.status(400).json(result);
+  }
+  res.json({ success: true, message: 'Request bon material telah ditolak.', request: result.request });
+});
+
+// -------------------------------------------------------------
+// 19. TELEGRAM USERS MANAGEMENT API (SUPERADMIN)
+// -------------------------------------------------------------
+app.get('/api/telegram-users', authenticateToken, requireRoles(['superadmin']), (req, res) => {
+  const db = readDB();
+  res.json(db.telegram_users || []);
+});
+
+app.post('/api/telegram-users', authenticateToken, requireRoles(['superadmin']), (req, res) => {
+  const db = readDB();
+  const { telegram_id, name, role } = req.body;
+  if (!telegram_id || !name || !role) {
+    return res.status(400).json({ success: false, message: 'ID Telegram, Nama, dan Role wajib diisi!' });
+  }
+
+  const allowedRoles = ['teknisi', 'admin', 'pm', 'superadmin'];
+  if (!allowedRoles.includes(role)) {
+    return res.status(400).json({ success: false, message: 'Role harus salah satu dari: teknisi, admin, pm, superadmin' });
+  }
+
+  if (!Array.isArray(db.telegram_users)) db.telegram_users = [];
+  const existing = db.telegram_users.find(u => String(u.telegram_id) === String(telegram_id));
+  if (existing) {
+    existing.name = String(name).trim();
+    existing.role = role;
+    writeDB(db);
+    return res.json({ success: true, message: 'User Telegram diperbarui.', user: existing });
+  }
+
+  const newUser = {
+    id: 'tg-user-' + Date.now(),
+    telegram_id: String(telegram_id).trim(),
+    name: String(name).trim(),
+    role,
+    created_at: new Date().toISOString().split('T')[0]
+  };
+
+  db.telegram_users.push(newUser);
+  writeDB(db);
+  res.status(201).json({ success: true, message: 'User Telegram berhasil didaftarkan.', user: newUser });
+});
+
+app.delete('/api/telegram-users/:id', authenticateToken, requireRoles(['superadmin']), (req, res) => {
+  const db = readDB();
+  const idx = (db.telegram_users || []).findIndex(u => u.id === req.params.id || String(u.telegram_id) === req.params.id);
+  if (idx === -1) return res.status(404).json({ success: false, message: 'User Telegram tidak ditemukan.' });
+
+  const [removed] = db.telegram_users.splice(idx, 1);
+  writeDB(db);
+  res.json({ success: true, message: 'User Telegram dihapus.', removed });
+});
+
+// -------------------------------------------------------------
+// 20. GLOBAL ERROR HANDLER
 // -------------------------------------------------------------
 app.use((err, req, res, next) => {
   if (err && err.message && err.message.includes('CORS')) {
@@ -1082,9 +1673,12 @@ app.use((err, req, res, next) => {
 });
 
 // -------------------------------------------------------------
-// 18. SERVER INITIALIZATION
+// 21. SERVER INITIALIZATION
 // -------------------------------------------------------------
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   ensureMaterialSeeds();
+  if (process.env.NODE_ENV !== 'test' && !process.env.SMOKE_PORT) {
+    telegramBot.start();
+  }
   console.log(`PT Akses Kwalitas Unggul Server running at http://localhost:${PORT}`);
 });

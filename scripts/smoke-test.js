@@ -43,7 +43,9 @@ function req(method, urlPath, body, headers = {}) {
       res.on('data', (c) => (chunks += c));
       res.on('end', () => {
         let parsed = null;
-        try { parsed = chunks ? JSON.parse(chunks) : null; } catch (_) {}
+        try { parsed = chunks ? JSON.parse(chunks) : null; } catch (_) {
+          parsed = chunks;
+        }
         resolve({ status: res.statusCode, body: parsed });
       });
     });
@@ -150,6 +152,323 @@ async function waitForServer(timeoutMs = 10000) {
     const proj = await req('GET', '/api/projects', null, AUTH);
     check('GET /api/projects -> 200 + array', proj.status === 200 && Array.isArray(proj.body));
     check('GET /api/projects tanpa token -> 401', (await req('GET', '/api/projects')).status === 401);
+
+    // Material Inbounds (Material Datang ke Gudang)
+    const inbRes = await req('POST', '/api/material-inbounds', {
+      material_id: 'mat-seed-001',
+      qty: 50,
+      supplier: 'PT Pabrik Tiang Maju',
+      received_date: '2026-11-04',
+      notes: 'Surat Jalan #SJ-9981'
+    }, PM_AUTH);
+    check('POST /api/material-inbounds (pm) -> 201', inbRes.status === 201 && inbRes.body.success);
+    const inbId = inbRes.body && inbRes.body.inbound ? inbRes.body.inbound.id : 'inb-none';
+
+    const matsAfterInb = await req('GET', '/api/materials', null, AUTH);
+    const mat001 = matsAfterInb.body.find(m => m.id === 'mat-seed-001');
+    check('stok gudang bertambah otomatis (+50)', !!mat001 && mat001.stock_qty >= 50);
+
+    const inbList = await req('GET', '/api/material-inbounds', null, AUTH);
+    check('GET /api/material-inbounds -> 200 + array', inbList.status === 200 && inbList.body.length >= 1);
+
+    // Bon Requests (Antrean Request Pending dari Telegram/Lapangan)
+    const bonReqRes = await req('POST', '/api/bon-requests', {
+      project_id: 'proj-test',
+      items: [{
+        material_id: 'mat-seed-001',
+        name: 'Tiang Beton 7m',
+        category: 'Tiang',
+        variant: '7m',
+        unit: 'btg',
+        qty_planned: 15
+      }],
+      notes: 'Tambahan tiang untuk jalan sempit'
+    }, AUTH);
+    check('POST /api/bon-requests -> 201 (status Pending)', bonReqRes.status === 201 && bonReqRes.body.request.status === 'Pending');
+    const reqId = bonReqRes.body && bonReqRes.body.request ? bonReqRes.body.request.id : 'req-none';
+
+    const pendingList = await req('GET', '/api/bon-requests?status=Pending', null, AUTH);
+    check('GET /api/bon-requests?status=Pending -> 1 request', pendingList.status === 200 && pendingList.body.some(r => r.id === reqId));
+
+    // Approval PM atas Request Bon
+    const approveRes = await req('POST', `/api/bon-requests/${reqId}/approve`, {}, PM_AUTH);
+    check('POST /api/bon-requests/:id/approve (pm) -> 200', approveRes.status === 200 && approveRes.body.request.status === 'Disetujui');
+    const activeBonId = approveRes.body && approveRes.body.bon ? approveRes.body.bon.id : ('bon-proj-test');
+
+    // Cek bahwa item request otomatis masuk ke bon_material WO terkait
+    const bonMerged = await req('GET', `/api/bon-material/${activeBonId}`, null, AUTH);
+    const mergedItem = bonMerged.body && bonMerged.body.items ? bonMerged.body.items.find(it => it.material_id === 'mat-seed-001') : null;
+    check('item request ter-merge ke bon_material (qty_planned=15)', !!mergedItem && mergedItem.qty_planned === 15);
+
+    // Pengurangan stok gudang manual berdasarkan realisasi pemasangan lapangan (qty_used)
+    const stockBeforeUsed = mat001.stock_qty;
+    const bonInstallUpdate = await req('PUT', `/api/bon-material/${activeBonId}`, {
+      items: [{
+        material_id: 'mat-seed-001',
+        name: 'Tiang Beton 7m',
+        category: 'Tiang',
+        variant: '7m',
+        unit: 'btg',
+        qty_planned: 15,
+        qty_arrived: 15,
+        qty_used: 10 // Pemasangan di lapangan 10 btg
+      }]
+    }, PM_AUTH);
+    check('PUT /api/bon-material dengan qty_used -> 200', bonInstallUpdate.status === 200);
+
+    const matsAfterUsed = await req('GET', '/api/materials', null, AUTH);
+    const mat001AfterUsed = matsAfterUsed.body.find(m => m.id === 'mat-seed-001');
+    check('stok gudang terpotong manual sesuai yang terpasang (-10)', !!mat001AfterUsed && mat001AfterUsed.stock_qty === (stockBeforeUsed - 10));
+
+    // Telegram Users Management
+    const addTgUser = await req('POST', '/api/telegram-users', {
+      telegram_id: '123456789',
+      name: 'Rudi Teknisi',
+      role: 'teknisi'
+    }, AUTH);
+    check('POST /api/telegram-users (superadmin) -> 201', addTgUser.status === 201 && addTgUser.body.success);
+
+    const tgUsersList = await req('GET', '/api/telegram-users', null, AUTH);
+    check('GET /api/telegram-users -> array berisi user baru', tgUsersList.status === 200 && tgUsersList.body.some(u => u.telegram_id === '123456789'));
+
+    const delTgUser = await req('DELETE', '/api/telegram-users/123456789', null, AUTH);
+    check('DELETE /api/telegram-users/:id -> 200', delTgUser.status === 200 && delTgUser.body.success);
+
+    // =============================================================
+    // MASTER EKSEKUTOR CRUD & PROTEKSI WO AKTIF
+    // =============================================================
+    const newExecInternal = await req('POST', '/api/executors', {
+      name: 'Tim Internal Charlie',
+      type: 'Internal',
+      phone: '0812-3344-5566',
+      pic: 'Koordinator Dian',
+      wilayah: 'Surabaya Timur',
+      fleet_no: 'L-1234-AB / GranMax',
+      standard_rates: 'Uang Jalan: Rp 450.000/hari + BBM',
+      specialization: 'FTTH OSP & Splicing',
+      status: 'Aktif'
+    }, PM_AUTH);
+    check('POST /api/executors (Internal, pm) -> 201', newExecInternal.status === 201 && newExecInternal.body.success);
+    const intExecId = newExecInternal.body.executor.id;
+
+    const newExecMandor = await req('POST', '/api/executors', {
+      name: 'Mandor Joko Subkon',
+      type: 'Mandor',
+      phone: '0857-9988-7766',
+      pic: 'Joko Susilo',
+      wilayah: 'Sidoarjo',
+      fleet_no: '-',
+      standard_rates: 'Tiang: Rp 65.000/btg | Tarik KU: Rp 1.800/m',
+      specialization: 'Tanam Tiang & Penarikan Kabel',
+      status: 'Standby'
+    }, PM_AUTH);
+    check('POST /api/executors (Mandor, pm) -> 201', newExecMandor.status === 201 && newExecMandor.body.success);
+    const mandorExecId = newExecMandor.body.executor.id;
+
+    // Cek GET /api/executors bahwa data fleet_no & standard_rates tersimpan utuh
+    const execList = await req('GET', '/api/executors', null, AUTH);
+    const foundInt = execList.body.find(e => e.id === intExecId);
+    check('GET /api/executors menyimpan fleet_no & standard_rates', !!foundInt && foundInt.fleet_no === 'L-1234-AB / GranMax' && foundInt.standard_rates.includes('450.000'));
+
+    // PUT /api/executors/:id update fields (type, fleet_no, standard_rates, status)
+    const updateExec = await req('PUT', `/api/executors/${intExecId}`, {
+      fleet_no: 'L-9999-ZZ / Luxio Baru',
+      status: 'Standby',
+      standard_rates: 'Uang Jalan: Rp 500.000/hari + BBM'
+    }, PM_AUTH);
+    check('PUT /api/executors/:id (pm) -> 200', updateExec.status === 200 && updateExec.body.success);
+
+    const execListAfterPut = await req('GET', '/api/executors', null, AUTH);
+    const foundUpdatedInt = execListAfterPut.body.find(e => e.id === intExecId);
+    check('PUT berhasil memperbarui fleet_no & status', !!foundUpdatedInt && foundUpdatedInt.fleet_no === 'L-9999-ZZ / Luxio Baru' && foundUpdatedInt.status === 'Standby');
+
+    // Role check: PM DELETE -> 403 Forbidden
+    const delPmForbidden = await req('DELETE', `/api/executors/${intExecId}`, null, PM_AUTH);
+    check('DELETE /api/executors/:id (pm) -> 403 Forbidden', delPmForbidden.status === 403);
+
+    // Proteksi WO aktif: Buat WO baru yang ditugaskan ke mandorExecId
+    const projWithExec = await req('POST', '/api/projects', {
+      wo_number: 'WO-ACTIVE-EXEC-001',
+      client_name: 'Telkom Akses',
+      cluster_name: 'Klaster Rungkut',
+      executor_type: 'Mandor',
+      executor_id: mandorExecId,
+      contract_value: 100000000,
+      mandor_cost: 60000000,
+      target_date: '2026-12-01'
+    }, PM_AUTH);
+    check('POST /api/projects dengan executor_id -> 201', projWithExec.status === 201);
+
+    // Coba hapus eksekutor yang punya active WO -> Ditolak 400 Bad Request
+    const delBlocked = await req('DELETE', `/api/executors/${mandorExecId}`, null, AUTH);
+    check('DELETE eksekutor yang punya WO aktif -> 400 Bad Request (terproteksi)', delBlocked.status === 400 && delBlocked.body.message.includes('WO aktif'));
+
+    // Hapus eksekutor bebas WO (intExecId) oleh Superadmin -> Berhasil 200
+    const delSuccess = await req('DELETE', `/api/executors/${intExecId}`, null, AUTH);
+    check('DELETE eksekutor tanpa WO (superadmin) -> 200 OK', delSuccess.status === 200 && delSuccess.body.success);
+
+    // =============================================================
+    // INVOICE / CASHFLOW: JATUH TEMPO OTOMATIS 2 BULAN & WORK ORDER
+    // =============================================================
+    const newInvoice = await req('POST', '/api/invoices', {
+      project_id: 'proj-test',
+      wo_number: 'WO-TEST-001',
+      client_name: 'Klien Uji',
+      term_name: 'Klaster Uji (Nama Work Order)',
+      amount: 50000000,
+      invoice_date: '2026-11-01'
+    }, FIN_AUTH);
+    check('POST /api/invoices (finance) -> 201', newInvoice.status === 201);
+    check('Jatuh tempo otomatis 2 bulan setelah invoice_date (2027-01-01)', newInvoice.body.due_date === '2027-01-01');
+    check('Nama Work Order tersimpan di invoice term_name', newInvoice.body.term_name === 'Klaster Uji (Nama Work Order)');
+    const testInvId = newInvoice.body.id;
+
+    // CRUD INVOICE: PUT /api/invoices/:id & DELETE /api/invoices/:id
+    const editInvRes = await req('PUT', `/api/invoices/${testInvId}`, {
+      amount: 65000000,
+      term_name: 'Klaster Uji Termin 1 Revisi'
+    }, FIN_AUTH);
+    check('PUT /api/invoices/:id (finance) -> 200', editInvRes.status === 200 && editInvRes.body.success);
+    check('Invoice amount berhasil diupdate menjadi 65.000.000', editInvRes.body.invoice.amount === 65000000);
+
+    const delInvRes = await req('DELETE', `/api/invoices/${testInvId}`, null, FIN_AUTH);
+    check('DELETE /api/invoices/:id (finance) -> 200', delInvRes.status === 200 && delInvRes.body.success);
+
+    // Test Manual ID INVOICE Input & Conflict Check
+    const manualInv = await req('POST', '/api/invoices', {
+      id: 'INV/2026/XI/0099',
+      project_id: 'proj-test',
+      wo_number: 'WO-TEST-MANUAL-ID',
+      client_name: 'Telkom Akses',
+      term_name: 'Pekerjaan Termin Manual ID',
+      amount: 75000000,
+      invoice_date: '2026-11-05'
+    }, FIN_AUTH);
+    check('POST /api/invoices dengan ID manual -> 201', manualInv.status === 201 && manualInv.body.id === 'INV/2026/XI/0099');
+    check('Status default invoice baru adalah Belum Cashbank', manualInv.body.status === 'Belum Cashbank');
+
+    // Test transisi status: menekan tombol Lunas -> berubah menjadi Sudah Cashbank
+    const payCashbankRes = await req('PUT', `/api/invoices/${encodeURIComponent('INV/2026/XI/0099')}/status`, {
+      status: 'Sudah Cashbank'
+    }, FIN_AUTH);
+    check('PUT status invoice menjadi Sudah Cashbank -> 200', payCashbankRes.status === 200 && payCashbankRes.body.status === 'Sudah Cashbank');
+    check('Invoice Sudah Cashbank mencatat paid_date', !!payCashbankRes.body.paid_date);
+
+    const duplicateIdInv = await req('POST', '/api/invoices', {
+      id: 'INV/2026/XI/0099',
+      project_id: 'proj-test',
+      wo_number: 'WO-TEST-DUPLICATE',
+      client_name: 'Telkom Akses',
+      term_name: 'Pekerjaan Termin Duplicate ID',
+      amount: 25000000,
+      invoice_date: '2026-11-05'
+    }, FIN_AUTH);
+    check('POST /api/invoices dengan ID duplikat -> 409 Conflict', duplicateIdInv.status === 409);
+
+    // Verifikasi dynamic monthlyRevenue di Executive Dashboard
+    const statsRes = await req('GET', '/api/dashboard/stats', null, AUTH);
+    check('GET /api/dashboard/stats -> 200', statsRes.status === 200);
+    check('monthlyRevenue adalah array 6 bulan', Array.isArray(statsRes.body.monthlyRevenue) && statsRes.body.monthlyRevenue.length === 6);
+    const targetMonth = statsRes.body.monthlyRevenue.find(m => m.key === '2026-11');
+    check('monthlyRevenue 2026-11 menghitung billed dinamis (>= 75 jt)', !!targetMonth && targetMonth.billed >= 75000000);
+    check('monthlyRevenue 2026-11 menghitung received dinamis (>= 75 jt)', !!targetMonth && targetMonth.received >= 75000000);
+
+    await req('DELETE', `/api/invoices/${encodeURIComponent('INV/2026/XI/0099')}`, null, FIN_AUTH);
+
+    // =============================================================
+    // MANDOR PAYOUTS / KAS KELUAR CRUD
+    // =============================================================
+    const newPayout = await req('POST', '/api/mandor-payouts', {
+      project_id: 'proj-test',
+      mandor_name: 'Mandor Bambang',
+      milestone_stage: 'Penarikan Kabel (KU Fiber)',
+      amount: 15000000,
+      notes: 'Klaim penarikan kabel jalur utama'
+    }, PM_AUTH);
+    check('POST /api/mandor-payouts (pm) -> 201', newPayout.status === 201 && newPayout.body.success);
+    const testPayoutId = newPayout.body.payout.id;
+
+    const editPayoutRes = await req('PUT', `/api/mandor-payouts/${testPayoutId}`, {
+      amount: 18000000,
+      notes: 'Klaim revisi penarikan kabel jalur utama + drop core'
+    }, FIN_AUTH);
+    check('PUT /api/mandor-payouts/:id (finance) -> 200', editPayoutRes.status === 200 && editPayoutRes.body.success);
+    check('Payout amount berhasil diupdate menjadi 18.000.000', editPayoutRes.body.payout.amount === 18000000);
+
+    const delPayoutRes = await req('DELETE', `/api/mandor-payouts/${testPayoutId}`, null, PM_AUTH);
+    check('DELETE /api/mandor-payouts/:id (pm) -> 200', delPayoutRes.status === 200 && delPayoutRes.body.success);
+
+    // =============================================================
+    // SP/PO MASTER & RELASI 1 SP TO N PEKERJAAN (WORK ORDERS)
+    // =============================================================
+    const spListRes = await req('GET', '/api/sp-orders', null, AUTH);
+    check('GET /api/sp-orders -> 200 + array', spListRes.status === 200 && Array.isArray(spListRes.body));
+
+    const postSpRes = await req('POST', '/api/sp-orders', {
+      sp_number: 'SP-TEST-MULTI-999',
+      client_name: 'Telkom Akses',
+      notes: 'SP Uji Multi Pekerjaan'
+    }, PM_AUTH);
+    check('POST /api/sp-orders -> 201', postSpRes.status === 201 && postSpRes.body.success);
+    const multiSpId = postSpRes.body.sp.id;
+
+    // Tambah Pekerjaan 1 di bawah SP-TEST-MULTI-999
+    const job1Res = await req('POST', '/api/projects', {
+      sp_number: 'SP-TEST-MULTI-999',
+      job_name: 'Pekerjaan Tarik Feeder Rungkut',
+      client_name: 'Telkom Akses',
+      executor_type: 'Mandor',
+      contract_value: 120000000,
+      mandor_cost: 65000000,
+      target_date: '2026-12-15'
+    }, PM_AUTH);
+    check('POST /api/projects Job 1 -> 201', job1Res.status === 201);
+
+    // Tambah Pekerjaan 2 di bawah SP-TEST-MULTI-999 yang sama
+    const job2Res = await req('POST', '/api/projects', {
+      sp_number: 'SP-TEST-MULTI-999',
+      job_name: 'Pekerjaan Distribusi Klaster A',
+      client_name: 'Telkom Akses',
+      executor_type: 'Internal',
+      contract_value: 180000000,
+      mandor_cost: 85000000,
+      target_date: '2026-12-30'
+    }, PM_AUTH);
+    check('POST /api/projects Job 2 -> 201', job2Res.status === 201);
+
+    // Cek GET /api/sp-orders apakah mengakumulasi 2 pekerjaan dan total BOQ 300 juta
+    const spCheckList = await req('GET', '/api/sp-orders', null, AUTH);
+    const multiSp = spCheckList.body.find(s => s.sp_number === 'SP-TEST-MULTI-999');
+    check('SP memiliki job_count = 2', !!multiSp && multiSp.job_count === 2);
+    check('SP mengakumulasi total_boq = 300.000.000', !!multiSp && multiSp.total_boq === 300000000);
+    check('SP mengakumulasi total_hpp = 150.000.000', !!multiSp && multiSp.total_hpp === 150000000);
+    check('SP menghitung margin_percent = 50.0%', !!multiSp && multiSp.margin_percent === 50);
+
+    // Proteksi: DELETE SP yang masih memiliki pekerjaan aktif -> 400 Bad Request
+    const delSpBlocked = await req('DELETE', `/api/sp-orders/${multiSpId}`, null, AUTH);
+    check('DELETE SP dengan pekerjaan aktif -> 400 Bad Request', delSpBlocked.status === 400);
+
+    // =============================================================
+    // FITUR MODE GELAP (DARK MODE) INTEGRITY TEST
+    // =============================================================
+    const dashHtmlRes = await req('GET', '/dashboard.html', null, null);
+    check('GET /dashboard.html -> 200', dashHtmlRes.status === 200);
+    const dashHtmlText = typeof dashHtmlRes.body === 'string' ? dashHtmlRes.body : JSON.stringify(dashHtmlRes.body);
+    check('dashboard.html memuat konfigurasi darkMode: class', dashHtmlText.includes("darkMode: 'class'"));
+    check('dashboard.html memuat tombol btnThemeToggle', dashHtmlText.includes('btnThemeToggle'));
+    check('dashboard.html memuat icon themeIconSun dan themeIconMoon', dashHtmlText.includes('themeIconSun') && dashHtmlText.includes('themeIconMoon'));
+    check('dashboard.html memuat header tabel tagihan kas masuk baru', dashHtmlText.includes('ID Invoice') && dashHtmlText.includes('Nama SP') && dashHtmlText.includes('Total LOP') && dashHtmlText.includes('Nominal Total (Rp)'));
+    check('dashboard.html memuat label Estimasi Laba Bersih & Net Margin', dashHtmlText.includes('Estimasi Laba Bersih') && dashHtmlText.includes('Net Margin'));
+
+    const appJsRes = await req('GET', '/app.js', null, null);
+    check('GET /app.js -> 200', appJsRes.status === 200);
+    const appJsText = typeof appJsRes.body === 'string' ? appJsRes.body : JSON.stringify(appJsRes.body);
+    check('app.js memuat fungsi toggleTheme & isDarkMode', appJsText.includes('function toggleTheme') && appJsText.includes('function isDarkMode'));
+
+    const indexHtmlRes = await req('GET', '/index.html', null, null);
+    check('GET /index.html -> 200', indexHtmlRes.status === 200);
+    const indexHtmlText = typeof indexHtmlRes.body === 'string' ? indexHtmlRes.body : JSON.stringify(indexHtmlRes.body);
+    check('index.html memuat toggleIndexTheme', indexHtmlText.includes('toggleIndexTheme'));
 
     console.log(`\n${passed} passed, ${failed} failed`);
     process.exit(failed === 0 ? 0 : 1);
