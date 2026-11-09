@@ -705,6 +705,107 @@ async function loadProjects() {
   }
 }
 
+let openSpKeys = new Set();
+let spAccordionInitialized = false;
+
+function getGroupedProjects() {
+  const spGroups = [];
+  const spMap = new Map();
+
+  (projectsData || []).forEach(proj => {
+    const spKey = proj.sp_number || proj.wo_number || 'SP-UNKNOWN';
+    if (!spMap.has(spKey)) {
+      const g = {
+        sp_number: spKey,
+        client_name: proj.client_name,
+        created_at: proj.created_at,
+        jobs: []
+      };
+      spMap.set(spKey, g);
+      spGroups.push(g);
+    }
+    spMap.get(spKey).jobs.push(proj);
+  });
+  return spGroups;
+}
+
+function populateSpFilter(spGroups) {
+  const spSelect = document.getElementById('filter-sp');
+  if (!spSelect) return;
+  const currentVal = spSelect.value || 'All';
+
+  let html = '<option value="All">Semua SP/PO Induk (Semua Proyek)</option>';
+  spGroups.forEach(g => {
+    html += `<option value="${escapeQuote(g.sp_number)}">SP: ${escapeQuote(g.sp_number)} (${g.jobs.length} WO - ${escapeQuote(g.client_name)})</option>`;
+  });
+  spSelect.innerHTML = html;
+  if ([...spSelect.options].some(opt => opt.value === currentVal)) {
+    spSelect.value = currentVal;
+  }
+}
+
+function toggleSpAccordion(spKeySafe) {
+  const content = document.getElementById(`sp-content-${spKeySafe}`);
+  const chevron = document.getElementById(`sp-chevron-${spKeySafe}`);
+  const label = document.getElementById(`sp-toggle-label-${spKeySafe}`);
+  if (!content) return;
+
+  const isHidden = content.classList.contains('hidden');
+  if (isHidden) {
+    content.classList.remove('hidden');
+    openSpKeys.add(spKeySafe);
+    if (chevron) chevron.classList.add('rotate-180');
+    if (label) label.innerText = '(Klik untuk Ciutkan)';
+  } else {
+    content.classList.add('hidden');
+    openSpKeys.delete(spKeySafe);
+    if (chevron) chevron.classList.remove('rotate-180');
+    if (label) label.innerText = '(Klik untuk Buka Daftar WO)';
+  }
+}
+
+function expandAllSp(expand) {
+  const spGroups = getGroupedProjects();
+  spGroups.forEach(g => {
+    const spKeySafe = g.sp_number.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const content = document.getElementById(`sp-content-${spKeySafe}`);
+    const chevron = document.getElementById(`sp-chevron-${spKeySafe}`);
+    const label = document.getElementById(`sp-toggle-label-${spKeySafe}`);
+    if (expand) {
+      openSpKeys.add(spKeySafe);
+      if (content) content.classList.remove('hidden');
+      if (chevron) chevron.classList.add('rotate-180');
+      if (label) label.innerText = '(Klik untuk Ciutkan)';
+    } else {
+      openSpKeys.delete(spKeySafe);
+      if (content) content.classList.add('hidden');
+      if (chevron) chevron.classList.remove('rotate-180');
+      if (label) label.innerText = '(Klik untuk Buka Daftar WO)';
+    }
+  });
+}
+
+function filterWoUnderSp(spKeySafe) {
+  const select = document.getElementById(`select-wo-${spKeySafe}`);
+  if (!select) return;
+  const targetId = select.value;
+  const container = document.getElementById(`sp-jobs-container-${spKeySafe}`);
+  if (!container) return;
+
+  const cards = container.querySelectorAll('.wo-job-item');
+  cards.forEach(card => {
+    if (targetId === 'all') {
+      card.classList.remove('hidden');
+    } else {
+      if (card.dataset.projectId === targetId) {
+        card.classList.remove('hidden');
+      } else {
+        card.classList.add('hidden');
+      }
+    }
+  });
+}
+
 function renderProjectsList() {
   const container = document.getElementById('projects-container');
   if (!container) return;
@@ -721,26 +822,36 @@ function renderProjectsList() {
     return;
   }
 
-  // Kelompokkan pekerjaan berdasarkan Nomor SP/PO
-  const spGroups = [];
-  const spMap = new Map();
+  const allSpGroups = getGroupedProjects();
+  populateSpFilter(allSpGroups);
 
-  projectsData.forEach(proj => {
-    const spKey = proj.sp_number || proj.wo_number || 'SP-UNKNOWN';
-    if (!spMap.has(spKey)) {
-      const g = {
-        sp_number: spKey,
-        client_name: proj.client_name,
-        created_at: proj.created_at,
-        jobs: []
-      };
-      spMap.set(spKey, g);
-      spGroups.push(g);
-    }
-    spMap.get(spKey).jobs.push(proj);
-  });
+  // Jika belum inisialisasi accordion, default buka semua jika <= 3 SP, atau buka 2 pertama
+  if (!spAccordionInitialized) {
+    allSpGroups.forEach((g, idx) => {
+      const spKeySafe = g.sp_number.replace(/[^a-zA-Z0-9_-]/g, '_');
+      if (idx < 3) {
+        openSpKeys.add(spKeySafe);
+      }
+    });
+    spAccordionInitialized = true;
+  }
 
-  container.innerHTML = spGroups.map(group => {
+  // Filter SP jika dipilih via dropdown Filter Bar
+  const selectedSp = document.getElementById('filter-sp')?.value || 'All';
+  let displayGroups = allSpGroups;
+  if (selectedSp !== 'All') {
+    displayGroups = allSpGroups.filter(g => g.sp_number === selectedSp);
+    // Otomatis buka jika difilter
+    displayGroups.forEach(g => {
+      const spKeySafe = g.sp_number.replace(/[^a-zA-Z0-9_-]/g, '_');
+      openSpKeys.add(spKeySafe);
+    });
+  }
+
+  container.innerHTML = displayGroups.map(group => {
+    const spKeySafe = group.sp_number.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const isOpen = openSpKeys.has(spKeySafe);
+
     // Client Color Badge
     let clientColor = 'bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-950 dark:text-sky-300 dark:border-sky-800';
     if (group.client_name.includes('Icon')) clientColor = 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800';
@@ -751,26 +862,55 @@ function renderProjectsList() {
     const totalMargin = totalBOQ - totalHPP;
     const marginPct = totalBOQ > 0 ? Number(((totalMargin / totalBOQ) * 100).toFixed(1)) : 0;
     const avgProgress = Math.round(group.jobs.reduce((a, b) => a + (Number(b.progress_percent) || 0), 0) / group.jobs.length);
+    const doneJobsCount = group.jobs.filter(j => (Number(j.progress_percent) || 0) >= 100).length;
+
+    // Dropdown list WO di dalam SP jika pekerjaan > 1
+    const woDropdownControl = group.jobs.length > 1 ? `
+      <div class="bg-slate-50 dark:bg-slate-800/80 p-3 rounded-xl border border-slate-200 dark:border-slate-700/80 mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <i data-lucide="layers" class="w-4 h-4 text-sky-600 dark:text-sky-400"></i>
+          <span class="text-xs font-bold text-slate-700 dark:text-slate-300">Daftar Pekerjaan WO dalam SP:</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <select id="select-wo-${spKeySafe}" onchange="filterWoUnderSp('${spKeySafe}')"
+            class="text-xs font-semibold border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 cursor-pointer shadow-2xs">
+            <option value="all">Semua Pekerjaan (${group.jobs.length} WO - Tampilkan Semua)</option>
+            ${group.jobs.map((j, i) => `
+              <option value="${j.id}">WO #${i + 1}: ${escapeQuote(j.job_name || j.cluster_name)} [${j.progress_percent || 0}%] - ${formatIDR(j.contract_value)}</option>
+            `).join('')}
+          </select>
+        </div>
+      </div>
+    ` : '';
 
     return `
       <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden transition space-y-0">
-        <!-- SP/PO Induk Header -->
-        <div class="p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/60 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-          <div class="space-y-1.5">
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="px-2.5 py-0.5 text-xs font-bold rounded-full border ${clientColor}">${group.client_name}</span>
-              <span class="font-mono font-bold text-slate-900 dark:text-slate-100 text-base">SP/PO: ${group.sp_number}</span>
-              <span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
-                ${group.jobs.length} Pekerjaan Lapangan
-              </span>
+        <!-- SP/PO Induk Header (Dropdown / Accordion Trigger) -->
+        <div onclick="toggleSpAccordion('${spKeySafe}')"
+             class="p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/60 hover:bg-slate-100/60 dark:hover:bg-slate-800/80 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 cursor-pointer transition select-none">
+          <div class="flex items-start gap-3">
+            <div id="sp-chevron-${spKeySafe}" class="mt-0.5 p-1.5 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-200 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}">
+              <i data-lucide="chevron-down" class="w-4 h-4"></i>
             </div>
-            <p class="text-xs text-slate-500 dark:text-slate-400">
-              Akumulasi progres fisik SP: <b class="text-slate-800 dark:text-slate-200">${avgProgress}%</b> • Terbit: <span class="text-slate-700 dark:text-slate-300 font-medium">${group.created_at || '-'}</span>
-            </p>
+            <div class="space-y-1.5">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="px-2.5 py-0.5 text-xs font-bold rounded-full border ${clientColor}">${group.client_name}</span>
+                <span class="font-mono font-bold text-slate-900 dark:text-slate-100 text-base">SP/PO: ${group.sp_number}</span>
+                <span class="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                  ${group.jobs.length} Pekerjaan (${doneJobsCount} Selesai)
+                </span>
+                <span id="sp-toggle-label-${spKeySafe}" class="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                  ${isOpen ? '(Klik untuk Ciutkan)' : '(Klik untuk Buka Daftar WO)'}
+                </span>
+              </div>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                Akumulasi progres fisik SP: <b class="text-slate-800 dark:text-slate-200">${avgProgress}%</b> • Terbit: <span class="text-slate-700 dark:text-slate-300 font-medium">${group.created_at || '-'}</span>
+              </p>
+            </div>
           </div>
 
           <!-- Total Finansial SP & Aksi Tambah Pekerjaan -->
-          <div class="flex flex-wrap items-center gap-3">
+          <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-between lg:justify-end" onclick="event.stopPropagation()">
             <div class="text-right bg-white dark:bg-slate-800 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs">
               <span class="text-[10px] text-slate-400 dark:text-slate-400 font-semibold block uppercase">Total Nilai BOQ SP</span>
               <span class="text-sm font-bold text-slate-900 dark:text-slate-100">${formatIDR(totalBOQ)}</span>
@@ -785,56 +925,59 @@ function renderProjectsList() {
           </div>
         </div>
 
-        <!-- Daftar Pekerjaan / Work Orders di bawah SP ini -->
-        <div class="p-5 space-y-5 divide-y divide-slate-100 dark:divide-slate-800">
-          ${group.jobs.map((proj, idx) => {
-            let execBadge = '';
-            if (proj.executor_type === 'Campuran') {
-              execBadge = `<span class="inline-flex items-center gap-1 bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 px-2 py-0.5 rounded text-[11px] font-semibold"><i data-lucide="layers" class="w-3 h-3"></i> Campuran: ${proj.executor_name}</span>`;
-            } else if (proj.executor_type === 'Internal') {
-              execBadge = `<span class="inline-flex items-center gap-1 bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 px-2 py-0.5 rounded text-[11px] font-semibold"><i data-lucide="shield" class="w-3 h-3"></i> Internal: ${proj.executor_name}</span>`;
-            } else {
-              execBadge = `<span class="inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded text-[11px] font-semibold"><i data-lucide="hard-hat" class="w-3 h-3"></i> Mandor: ${proj.executor_name}</span>`;
-            }
+        <!-- Dropdown Body: Daftar Pekerjaan / Work Orders di bawah SP ini -->
+        <div id="sp-content-${spKeySafe}" class="${isOpen ? '' : 'hidden'} p-5 space-y-5 transition">
+          ${woDropdownControl}
+          <div id="sp-jobs-container-${spKeySafe}" class="space-y-5 divide-y divide-slate-100 dark:divide-slate-800">
+            ${group.jobs.map((proj, idx) => {
+              let execBadge = '';
+              if (proj.executor_type === 'Campuran') {
+                execBadge = `<span class="inline-flex items-center gap-1 bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 px-2 py-0.5 rounded text-[11px] font-semibold"><i data-lucide="layers" class="w-3 h-3"></i> Campuran: ${proj.executor_name}</span>`;
+              } else if (proj.executor_type === 'Internal') {
+                execBadge = `<span class="inline-flex items-center gap-1 bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 px-2 py-0.5 rounded text-[11px] font-semibold"><i data-lucide="shield" class="w-3 h-3"></i> Internal: ${proj.executor_name}</span>`;
+              } else {
+                execBadge = `<span class="inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded text-[11px] font-semibold"><i data-lucide="hard-hat" class="w-3 h-3"></i> Mandor: ${proj.executor_name}</span>`;
+              }
 
-            return `
-              <div id="project-card-${proj.id}" class="${idx > 0 ? 'pt-5' : ''} space-y-3.5">
-                <!-- Header Pekerjaan -->
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white dark:bg-slate-800/90 p-3.5 rounded-xl border border-slate-200/90 dark:border-slate-700/80 shadow-2xs">
-                  <div>
-                    <div class="flex flex-wrap items-center gap-2 mb-1">
-                      <span class="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-1.5">
-                        <i data-lucide="map-pin" class="w-4 h-4 text-sky-600 dark:text-sky-400"></i>
-                        <span>${proj.job_name || proj.cluster_name}</span>
-                      </span>
-                      ${execBadge}
-                    </div>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">
-                      Nilai BOQ: <b class="text-slate-800 dark:text-slate-200">${formatIDR(proj.contract_value)}</b> • HPP Mandor: <b class="text-slate-800 dark:text-slate-200">${formatIDR(proj.mandor_cost)}</b> • Target Selesai: <span class="font-semibold text-slate-700 dark:text-slate-300">${proj.target_date || '-'}</span>
-                    </p>
-                  </div>
-
-                  <div class="flex items-center gap-3">
-                    <div class="flex items-center gap-2 w-36">
-                      <div class="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-                        <div class="bg-emerald-500 h-2 rounded-full transition-all" style="width: ${proj.progress_percent || 0}%"></div>
+              return `
+                <div id="project-card-${proj.id}" data-project-id="${proj.id}" class="wo-job-item ${idx > 0 ? 'pt-5' : ''} space-y-3.5">
+                  <!-- Header Pekerjaan -->
+                  <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white dark:bg-slate-800/90 p-3.5 rounded-xl border border-slate-200/90 dark:border-slate-700/80 shadow-2xs">
+                    <div>
+                      <div class="flex flex-wrap items-center gap-2 mb-1">
+                        <span class="font-bold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-1.5">
+                          <i data-lucide="map-pin" class="w-4 h-4 text-sky-600 dark:text-sky-400"></i>
+                          <span>${proj.job_name || proj.cluster_name}</span>
+                        </span>
+                        ${execBadge}
                       </div>
-                      <span class="text-xs font-bold text-slate-800 dark:text-slate-200 w-8 text-right">${proj.progress_percent || 0}%</span>
+                      <p class="text-xs text-slate-500 dark:text-slate-400">
+                        Nilai BOQ: <b class="text-slate-800 dark:text-slate-200">${formatIDR(proj.contract_value)}</b> • HPP Mandor: <b class="text-slate-800 dark:text-slate-200">${formatIDR(proj.mandor_cost)}</b> • Target Selesai: <span class="font-semibold text-slate-700 dark:text-slate-300">${proj.target_date || '-'}</span>
+                      </p>
                     </div>
 
-                    <button type="button" onclick="deleteProject('${proj.id}', '${escapeQuote(proj.job_name || proj.cluster_name)}')" title="Hapus Pekerjaan Ini" class="bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/60 text-red-600 dark:text-red-400 text-xs font-semibold p-2 rounded-lg border border-red-200 dark:border-red-900 transition flex items-center cursor-pointer">
-                      <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                    </button>
+                    <div class="flex items-center gap-3">
+                      <div class="flex items-center gap-2 w-36">
+                        <div class="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                          <div class="bg-emerald-500 h-2 rounded-full transition-all" style="width: ${proj.progress_percent || 0}%"></div>
+                        </div>
+                        <span class="text-xs font-bold text-slate-800 dark:text-slate-200 w-8 text-right">${proj.progress_percent || 0}%</span>
+                      </div>
+
+                      <button type="button" onclick="deleteProject('${proj.id}', '${escapeQuote(proj.job_name || proj.cluster_name)}')" title="Hapus Pekerjaan Ini" class="bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/60 text-red-600 dark:text-red-400 text-xs font-semibold p-2 rounded-lg border border-red-200 dark:border-red-900 transition flex items-center cursor-pointer">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- 4 Milestone Cards Grid -->
+                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    ${proj.milestones.map(m => renderMilestoneCard(m, proj)).join('')}
                   </div>
                 </div>
-
-                <!-- 4 Milestone Cards Grid -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  ${proj.milestones.map(m => renderMilestoneCard(m, proj)).join('')}
-                </div>
-              </div>
-            `;
-          }).join('')}
+              `;
+            }).join('')}
+          </div>
         </div>
       </div>
     `;
