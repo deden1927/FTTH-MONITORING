@@ -730,6 +730,7 @@
                   <option value="All">Semua Eksekutor</option>
                   <option value="Internal">Tim Internal Vendor</option>
                   <option value="Mandor">Mandor / Subkon</option>
+                  <option value="Campuran">Campuran (Internal & Mandor)</option>
                 </select>
               </div>
 
@@ -1141,33 +1142,138 @@
           </div>
         </div>
 
-        <!-- PILIHAN EKSEKUTOR (REVISI PENTING) -->
+        <!-- PILIHAN EKSEKUTOR (REVISI PENTING: DUKUNGAN MIXING/HYBRID PER MILESTONE) -->
         <div class="p-3.5 bg-sky-50/70 rounded-xl border border-sky-200 space-y-3">
           <label class="block font-bold text-sky-950 uppercase tracking-wider text-[11px]">
             ⚡ Alokasi Eksekutor Proyek *
           </label>
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <label
               class="flex items-center space-x-2 bg-white p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:border-sky-500">
               <input type="radio" name="modal_executor_type" value="Internal" onchange="toggleExecutorSelect()"
                 class="text-sky-600 cursor-pointer">
-              <span class="font-semibold text-slate-800">Tim Internal Vendor</span>
+              <span class="font-semibold text-slate-800 text-xs">Tim Internal</span>
             </label>
             <label
               class="flex items-center space-x-2 bg-white p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:border-sky-500">
               <input type="radio" name="modal_executor_type" value="Mandor" checked onchange="toggleExecutorSelect()"
                 class="text-sky-600 cursor-pointer">
-              <span class="font-semibold text-slate-800">Mandor / Subkon</span>
+              <span class="font-semibold text-slate-800 text-xs">Mandor / Subkon</span>
+            </label>
+            <label
+              class="flex items-center space-x-2 bg-white p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:border-sky-500">
+              <input type="radio" name="modal_executor_type" value="Campuran" onchange="toggleExecutorSelect()"
+                class="text-sky-600 cursor-pointer">
+              <span class="font-semibold text-purple-700 text-xs">Campuran (Mixing)</span>
             </label>
           </div>
 
-          <div>
-            <label for="modal-executor-id" class="block font-semibold text-slate-700 mb-1">Pilih Eksekutor Terdaftar
-              *</label>
+          <!-- Container Single Executor (Internal / Mandor Penuh) -->
+          <div id="container-single-executor">
+            <label for="modal-executor-id" class="block font-semibold text-slate-700 mb-1">Pilih Eksekutor Terdaftar *</label>
             <select id="modal-executor-id" required
               class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white text-xs">
               <!-- Dynamically populated from executors -->
             </select>
+          </div>
+
+          <!-- Container Mixing / Campuran Per-Milestone -->
+          <div id="container-mixing-milestones" class="hidden space-y-2.5 pt-2 border-t border-sky-200/80">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-purple-900">Alokasi Tim & Upah Per Tahapan Pengerjaan:</span>
+              <span class="text-[10px] text-purple-700 font-medium">Otomatis hitung total HPP</span>
+            </div>
+
+            <!-- 4 Milestone Rows -->
+            <div class="space-y-2">
+              <!-- 1. Tiang -->
+              <div class="p-2.5 bg-white rounded-lg border border-slate-200 space-y-1.5" data-mix-stage="Penanaman Tiang">
+                <div class="flex justify-between items-center">
+                  <span class="font-bold text-slate-800 text-[11px]">1. Penanaman Tiang</span>
+                  <div class="flex items-center gap-2">
+                    <label class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 cursor-pointer">
+                      <input type="radio" name="mix_type_0" value="Mandor" checked onchange="onMixStageTypeChange(0)" class="text-sky-600"> Mandor
+                    </label>
+                    <label class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 cursor-pointer">
+                      <input type="radio" name="mix_type_0" value="Internal" onchange="onMixStageTypeChange(0)" class="text-sky-600"> Internal
+                    </label>
+                  </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <select id="mix-exec-0" class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs bg-slate-50">
+                    <!-- populated -->
+                  </select>
+                  <input type="number" id="mix-cost-0" placeholder="Porsi Upah Mandor (Rp)" oninput="calcTotalMixingCost()"
+                    class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs" value="0">
+                </div>
+              </div>
+
+              <!-- 2. KU Fiber -->
+              <div class="p-2.5 bg-white rounded-lg border border-slate-200 space-y-1.5" data-mix-stage="Penarikan KU Fiber">
+                <div class="flex justify-between items-center">
+                  <span class="font-bold text-slate-800 text-[11px]">2. Penarikan KU Fiber</span>
+                  <div class="flex items-center gap-2">
+                    <label class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 cursor-pointer">
+                      <input type="radio" name="mix_type_1" value="Mandor" checked onchange="onMixStageTypeChange(1)" class="text-sky-600"> Mandor
+                    </label>
+                    <label class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 cursor-pointer">
+                      <input type="radio" name="mix_type_1" value="Internal" onchange="onMixStageTypeChange(1)" class="text-sky-600"> Internal
+                    </label>
+                  </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <select id="mix-exec-1" class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs bg-slate-50">
+                    <!-- populated -->
+                  </select>
+                  <input type="number" id="mix-cost-1" placeholder="Porsi Upah Mandor (Rp)" oninput="calcTotalMixingCost()"
+                    class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs" value="0">
+                </div>
+              </div>
+
+              <!-- 3. ODP & Splicing -->
+              <div class="p-2.5 bg-white rounded-lg border border-slate-200 space-y-1.5" data-mix-stage="Instalasi ODP & Splicing">
+                <div class="flex justify-between items-center">
+                  <span class="font-bold text-slate-800 text-[11px]">3. Instalasi ODP & Splicing</span>
+                  <div class="flex items-center gap-2">
+                    <label class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 cursor-pointer">
+                      <input type="radio" name="mix_type_2" value="Mandor" onchange="onMixStageTypeChange(2)" class="text-sky-600"> Mandor
+                    </label>
+                    <label class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 cursor-pointer">
+                      <input type="radio" name="mix_type_2" value="Internal" checked onchange="onMixStageTypeChange(2)" class="text-sky-600"> Internal
+                    </label>
+                  </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <select id="mix-exec-2" class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs bg-slate-50">
+                    <!-- populated -->
+                  </select>
+                  <input type="number" id="mix-cost-2" placeholder="Porsi Upah Mandor (Rp)" oninput="calcTotalMixingCost()"
+                    class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs" value="0" disabled>
+                </div>
+              </div>
+
+              <!-- 4. ATP -->
+              <div class="p-2.5 bg-white rounded-lg border border-slate-200 space-y-1.5" data-mix-stage="Testing & ATP">
+                <div class="flex justify-between items-center">
+                  <span class="font-bold text-slate-800 text-[11px]">4. Testing & ATP</span>
+                  <div class="flex items-center gap-2">
+                    <label class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 cursor-pointer">
+                      <input type="radio" name="mix_type_3" value="Mandor" onchange="onMixStageTypeChange(3)" class="text-sky-600"> Mandor
+                    </label>
+                    <label class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 cursor-pointer">
+                      <input type="radio" name="mix_type_3" value="Internal" checked onchange="onMixStageTypeChange(3)" class="text-sky-600"> Internal
+                    </label>
+                  </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <select id="mix-exec-3" class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs bg-slate-50">
+                    <!-- populated -->
+                  </select>
+                  <input type="number" id="mix-cost-3" placeholder="Porsi Upah Mandor (Rp)" oninput="calcTotalMixingCost()"
+                    class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs" value="0" disabled>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1261,6 +1367,36 @@
             </div>
           </div>
           <p class="text-[10px] text-slate-500">Standar Telkom: -16 s/d -24 dBm.</p>
+        </div>
+
+        <!-- Alokasi Eksekutor Tahapan Ini -->
+        <div class="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-800 dark:text-slate-200 text-[11px] flex items-center gap-1.5">
+              <i data-lucide="users" class="w-3.5 h-3.5 text-sky-600"></i> Penanggung Jawab Tahapan
+            </span>
+            <div class="flex items-center gap-2">
+              <label class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                <input type="radio" name="modal_m_exec_type" value="Mandor" onchange="onModalMilestoneExecTypeChange()" class="text-sky-600"> Mandor
+              </label>
+              <label class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                <input type="radio" name="modal_m_exec_type" value="Internal" onchange="onModalMilestoneExecTypeChange()" class="text-sky-600"> Internal
+              </label>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label class="block text-slate-600 dark:text-slate-400 text-[10px] mb-0.5 font-medium">Pilih Tim / Mandor</label>
+              <select id="modal-m-exec-id" class="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-900 text-xs font-medium">
+                <!-- populated -->
+              </select>
+            </div>
+            <div id="container-m-stage-cost">
+              <label class="block text-slate-600 dark:text-slate-400 text-[10px] mb-0.5 font-medium">Upah Mandor Tahapan (Rp)</label>
+              <input type="number" id="modal-m-stage-cost" placeholder="Nominal upah tahapan"
+                class="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-900 text-xs">
+            </div>
+          </div>
         </div>
 
         <div>

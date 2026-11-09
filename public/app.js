@@ -589,9 +589,26 @@ function renderExecutorSummary(exData) {
   const container = document.getElementById('executor-summary-content');
   if (!container || !exData) return;
 
-  const totalVal = (exData.internalValue || 0) + (exData.mandorValue || 0);
-  const intPct = totalVal > 0 ? Math.round((exData.internalValue / totalVal) * 100) : 0;
-  const manPct = totalVal > 0 ? (100 - intPct) : 0;
+  const totalVal = (Number(exData.internalValue) || 0) + (Number(exData.mandorValue) || 0) + (Number(exData.mixedValue) || 0);
+  const intPct = totalVal > 0 ? Math.round(((Number(exData.internalValue) || 0) / totalVal) * 100) : 0;
+  const manPct = totalVal > 0 ? Math.round(((Number(exData.mandorValue) || 0) / totalVal) * 100) : 0;
+  const mixPct = totalVal > 0 ? Math.max(0, 100 - intPct - manPct) : 0;
+
+  const mixedCard = (exData.mixedCount > 0 || exData.mixedValue > 0) ? `
+    <!-- Tim Campuran (Mixing) Card -->
+    <div class="p-3 bg-purple-50/60 rounded-xl border border-purple-100">
+      <div class="flex justify-between items-center mb-1">
+        <span class="font-bold text-xs text-purple-900 flex items-center gap-1.5">
+          <i data-lucide="layers" class="w-4 h-4 text-purple-600"></i> Campuran / Mixing (${exData.mixedCount || 0} Proyek)
+        </span>
+        <span class="font-bold text-xs text-purple-700">${formatIDR(exData.mixedValue || 0)} (${mixPct}%)</span>
+      </div>
+      <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+        <div class="bg-purple-600 h-2 rounded-full" style="width: ${mixPct}%"></div>
+      </div>
+      <p class="text-[11px] text-purple-700 mt-1">Kolaborasi Fleksibel • Mandor pengerjaan sipil & Internal terminasi/ATP.</p>
+    </div>
+  ` : '';
 
   container.innerHTML = `
     <!-- Tim Internal Card -->
@@ -621,6 +638,8 @@ function renderExecutorSummary(exData) {
       </div>
       <p class="text-[11px] text-amber-700 mt-1">Skalabilitas Tinggi • Upah dikunci per meter/tiang/ODP tervalidasi.</p>
     </div>
+
+    ${mixedCard}
   `;
   if (window.lucide) lucide.createIcons();
 }
@@ -726,10 +745,14 @@ function renderProjectsList() {
         <!-- Daftar Pekerjaan / Work Orders di bawah SP ini -->
         <div class="p-5 space-y-5 divide-y divide-slate-100 dark:divide-slate-800">
           ${group.jobs.map((proj, idx) => {
-            const isInternal = proj.executor_type === 'Internal';
-            const execBadge = isInternal
-              ? `<span class="inline-flex items-center gap-1 bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 px-2 py-0.5 rounded text-[11px] font-semibold"><i data-lucide="shield" class="w-3 h-3"></i> Internal: ${proj.executor_name}</span>`
-              : `<span class="inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded text-[11px] font-semibold"><i data-lucide="hard-hat" class="w-3 h-3"></i> Mandor: ${proj.executor_name}</span>`;
+            let execBadge = '';
+            if (proj.executor_type === 'Campuran') {
+              execBadge = `<span class="inline-flex items-center gap-1 bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 px-2 py-0.5 rounded text-[11px] font-semibold"><i data-lucide="layers" class="w-3 h-3"></i> Campuran: ${proj.executor_name}</span>`;
+            } else if (proj.executor_type === 'Internal') {
+              execBadge = `<span class="inline-flex items-center gap-1 bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 px-2 py-0.5 rounded text-[11px] font-semibold"><i data-lucide="shield" class="w-3 h-3"></i> Internal: ${proj.executor_name}</span>`;
+            } else {
+              execBadge = `<span class="inline-flex items-center gap-1 bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded text-[11px] font-semibold"><i data-lucide="hard-hat" class="w-3 h-3"></i> Mandor: ${proj.executor_name}</span>`;
+            }
 
             return `
               <div id="project-card-${proj.id}" class="${idx > 0 ? 'pt-5' : ''} space-y-3.5">
@@ -854,14 +877,22 @@ function renderMilestoneCard(m, proj) {
     `;
   }
 
+  const mExecName = m.executor_name || (m.executor_type === 'Internal' ? 'Tim Internal' : 'Mandor Lapangan');
+  const mExecBadge = m.executor_type === 'Internal'
+    ? `<span class="inline-flex items-center gap-1 text-[10px] font-semibold text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-950/70 border border-sky-200 dark:border-sky-800 px-1.5 py-0.5 rounded"><i data-lucide="shield" class="w-2.5 h-2.5"></i> ${mExecName}</span>`
+    : `<span class="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/70 border border-amber-200 dark:border-amber-800 px-1.5 py-0.5 rounded"><i data-lucide="hard-hat" class="w-2.5 h-2.5"></i> ${mExecName}${m.stage_cost ? ' • ' + formatIDR(m.stage_cost) : ''}</span>`;
+
   return `
     <div class="bg-white dark:bg-slate-850 dark:bg-slate-800/90 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/80 flex flex-col justify-between hover:border-sky-300 dark:hover:border-sky-500 transition">
       <div>
-        <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center justify-between mb-1.5">
           <span class="text-xs font-bold text-slate-800 dark:text-slate-100">${m.stage_name}</span>
           <span class="px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 ${statusBadgeClass}">
             <i data-lucide="${statusIcon}" class="w-3 h-3"></i> ${m.status}
           </span>
+        </div>
+        <div class="mb-2">
+          ${mExecBadge}
         </div>
 
         <p class="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2">${m.notes || 'Belum ada catatan.'}</p>
@@ -1335,8 +1366,13 @@ function renderExecutors() {
     return (projectsData || []).filter(p => {
       const matchId = p.executor_id && p.executor_id === e.id;
       const matchName = p.executor_name && p.executor_name.trim().toLowerCase() === e.name.trim().toLowerCase();
+      const hasActiveMilestone = (p.milestones || []).some(m => {
+        const mIdMatch = m.executor_id && m.executor_id === e.id;
+        const mNameMatch = m.executor_name && m.executor_name.trim().toLowerCase() === e.name.trim().toLowerCase();
+        return (mIdMatch || mNameMatch) && m.status !== 'Done';
+      });
       const isActive = p.status !== 'Selesai' && p.status !== 'Done';
-      return (matchId || matchName) && isActive;
+      return (matchId || matchName || hasActiveMilestone) && isActive;
     });
   };
 
@@ -1426,6 +1462,13 @@ function renderExecutors() {
               if (wo.client_name.includes('ID Net')) clientBadge = 'bg-purple-100 text-purple-800 border-purple-300';
 
               const prog = Number(wo.progress_percent) || 0;
+              const assignedStages = (wo.milestones || [])
+                .filter(m => (m.executor_id === e.id || (m.executor_name && m.executor_name.trim().toLowerCase() === e.name.trim().toLowerCase())))
+                .map(m => m.stage_name);
+              const stageBadge = (assignedStages.length > 0 && (wo.executor_type === 'Campuran' || assignedStages.length < 4))
+                ? `<div class="text-[10px] text-purple-700 dark:text-purple-300 font-semibold bg-purple-50 dark:bg-purple-950/60 px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-800">Bertugas: ${assignedStages.join(', ')}</div>`
+                : '';
+
               return `
                 <div class="p-2.5 bg-white rounded-xl border border-slate-200/90 shadow-2xs hover:border-sky-400 transition flex flex-col gap-1.5">
                   <div class="flex items-center justify-between gap-2">
@@ -1439,6 +1482,7 @@ function renderExecutors() {
                     </span>
                     <span class="text-slate-400 text-[10px] shrink-0 font-medium">Target: ${wo.target_date || '-'}</span>
                   </div>
+                  ${stageBadge}
                   <div class="flex items-center gap-2 pt-0.5">
                     <div class="flex-1 bg-slate-100 h-1.5 rounded-full overflow-hidden">
                       <div class="bg-emerald-500 h-1.5 rounded-full" style="width: ${prog}%"></div>
@@ -1737,7 +1781,70 @@ function populateExecutorModalOptions() {
 }
 
 function toggleExecutorSelect() {
-  populateExecutorModalOptions();
+  const mode = document.querySelector('input[name="modal_executor_type"]:checked')?.value || 'Mandor';
+  const singleContainer = document.getElementById('container-single-executor');
+  const mixContainer = document.getElementById('container-mixing-milestones');
+  const singleSelect = document.getElementById('modal-executor-id');
+
+  if (mode === 'Campuran') {
+    if (singleContainer) singleContainer.classList.add('hidden');
+    if (mixContainer) mixContainer.classList.remove('hidden');
+    if (singleSelect) singleSelect.required = false;
+    populateMixingExecSelectors();
+    calcTotalMixingCost();
+  } else {
+    if (singleContainer) singleContainer.classList.remove('hidden');
+    if (mixContainer) mixContainer.classList.add('hidden');
+    if (singleSelect) singleSelect.required = true;
+    populateExecutorModalOptions();
+  }
+}
+
+function onMixStageTypeChange(idx) {
+  const type = document.querySelector(`input[name="mix_type_${idx}"]:checked`)?.value || 'Mandor';
+  const select = document.getElementById(`mix-exec-${idx}`);
+  const costInput = document.getElementById(`mix-cost-${idx}`);
+
+  if (select) {
+    const filtered = executorsData.filter(e => e.type === type);
+    select.innerHTML = filtered.map(e => `
+      <option value="${e.id}">${e.name} ${e.pic ? '- PIC: ' + e.pic : ''}</option>
+    `).join('');
+  }
+
+  if (costInput) {
+    if (type === 'Internal') {
+      costInput.disabled = true;
+      costInput.value = 0;
+    } else {
+      costInput.disabled = false;
+    }
+  }
+  calcTotalMixingCost();
+}
+
+function calcTotalMixingCost() {
+  const mode = document.querySelector('input[name="modal_executor_type"]:checked')?.value;
+  if (mode !== 'Campuran') return;
+
+  let total = 0;
+  for (let i = 0; i < 4; i++) {
+    const type = document.querySelector(`input[name="mix_type_${i}"]:checked`)?.value;
+    if (type === 'Mandor') {
+      const val = Number(document.getElementById(`mix-cost-${i}`)?.value) || 0;
+      total += val;
+    }
+  }
+  const mandorCostInput = document.getElementById('modal-mandor-cost');
+  if (mandorCostInput) {
+    mandorCostInput.value = total;
+  }
+}
+
+function populateMixingExecSelectors() {
+  for (let i = 0; i < 4; i++) {
+    onMixStageTypeChange(i);
+  }
 }
 
 // -------------------------------------------------------------
@@ -1748,7 +1855,7 @@ function openModal(id) {
   if (m) m.classList.remove('hidden');
 
   if (id === 'modalAddProject') {
-    populateExecutorModalOptions();
+    toggleExecutorSelect();
     populateSpDropdown();
   } else if (id === 'modalAddInvoice') {
     populateInvoiceSpOptions();
@@ -1781,13 +1888,33 @@ function openUpdateMilestoneModal(milestoneId) {
 
   document.getElementById('modal-m-id').value = foundMilestone.id;
   document.getElementById('modal-m-stage').innerText = `Update: ${foundMilestone.stage_name}`;
-  document.getElementById('modal-m-project').innerText = `Nomor WO: ${parentProject ? parentProject.wo_number : '-'}`;
+  document.getElementById('modal-m-project').innerText = `Nomor WO: ${parentProject ? (parentProject.job_name || parentProject.wo_number) : '-'}`;
   document.getElementById('modal-m-status').value = foundMilestone.status || 'To-Do';
   document.getElementById('modal-m-progress').value = foundMilestone.progress_percent || 0;
   document.getElementById('modal-m-notes').value = foundMilestone.notes || '';
   document.getElementById('modal-m-blocked').value = foundMilestone.blocked_reason || '';
   document.getElementById('modal-m-otdr').value = foundMilestone.otdr_loss || '';
   document.getElementById('modal-m-opm').value = foundMilestone.opm_power || '';
+
+  // Set milestone executor details
+  const mExecType = foundMilestone.executor_type || (parentProject ? parentProject.executor_type : 'Mandor');
+  const typeRadio = document.querySelector(`input[name="modal_m_exec_type"][value="${mExecType === 'Internal' ? 'Internal' : 'Mandor'}"]`);
+  if (typeRadio) typeRadio.checked = true;
+
+  populateModalMilestoneExecSelect(mExecType === 'Internal' ? 'Internal' : 'Mandor');
+  const mExecSelect = document.getElementById('modal-m-exec-id');
+  if (mExecSelect && foundMilestone.executor_id) {
+    mExecSelect.value = foundMilestone.executor_id;
+  }
+  const stageCostInput = document.getElementById('modal-m-stage-cost');
+  if (stageCostInput) {
+    stageCostInput.value = foundMilestone.stage_cost || 0;
+  }
+  const costContainer = document.getElementById('container-m-stage-cost');
+  if (costContainer) {
+    if (mExecType === 'Internal') costContainer.classList.add('hidden');
+    else costContainer.classList.remove('hidden');
+  }
 
   toggleBlockedReasonField();
 
@@ -1800,6 +1927,30 @@ function openUpdateMilestoneModal(milestoneId) {
   }
 
   openModal('modalUpdateMilestone');
+}
+
+function onModalMilestoneExecTypeChange() {
+  const isInternal = document.querySelector('input[name="modal_m_exec_type"]:checked')?.value === 'Internal';
+  populateModalMilestoneExecSelect(isInternal ? 'Internal' : 'Mandor');
+  const costContainer = document.getElementById('container-m-stage-cost');
+  const stageCostInput = document.getElementById('modal-m-stage-cost');
+  if (costContainer) {
+    if (isInternal) {
+      costContainer.classList.add('hidden');
+      if (stageCostInput) stageCostInput.value = 0;
+    } else {
+      costContainer.classList.remove('hidden');
+    }
+  }
+}
+
+function populateModalMilestoneExecSelect(type) {
+  const select = document.getElementById('modal-m-exec-id');
+  if (!select) return;
+  const filtered = executorsData.filter(e => e.type === type);
+  select.innerHTML = filtered.map(e => `
+    <option value="${e.id}">${e.name} ${e.pic ? '- PIC: ' + e.pic : ''} (${e.phone})</option>
+  `).join('');
 }
 
 function toggleBlockedReasonField() {
@@ -1821,12 +1972,25 @@ async function submitUpdateMilestone(e) {
   const blocked_reason = document.getElementById('modal-m-blocked').value;
   const otdr_loss = document.getElementById('modal-m-otdr').value;
   const opm_power = document.getElementById('modal-m-opm').value;
+  const executor_type = document.querySelector('input[name="modal_m_exec_type"]:checked')?.value || 'Mandor';
+  const executor_id = document.getElementById('modal-m-exec-id')?.value || '';
+  const stage_cost = executor_type === 'Mandor' ? (Number(document.getElementById('modal-m-stage-cost')?.value) || 0) : 0;
 
   try {
     const res = await fetch(`/api/milestones/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, progress_percent, notes, blocked_reason, otdr_loss, opm_power })
+      body: JSON.stringify({
+        status,
+        progress_percent,
+        notes,
+        blocked_reason,
+        otdr_loss,
+        opm_power,
+        executor_type,
+        executor_id,
+        stage_cost
+      })
     });
     if (res.ok) {
       closeModal('modalUpdateMilestone');
@@ -1958,10 +2122,29 @@ async function submitNewProject(e) {
 
   const cluster_name = document.getElementById('modal-cluster').value.trim();
   const executor_type = document.querySelector('input[name="modal_executor_type"]:checked')?.value || 'Mandor';
-  const executor_id = document.getElementById('modal-executor-id').value;
+  let executor_id = document.getElementById('modal-executor-id')?.value || '';
   const contract_value = document.getElementById('modal-contract-value').value;
-  const mandor_cost = document.getElementById('modal-mandor-cost').value;
+  let mandor_cost = document.getElementById('modal-mandor-cost').value;
   const target_date = document.getElementById('modal-target-date').value;
+
+  let milestones_config = null;
+  if (executor_type === 'Campuran') {
+    const stageNames = ['Penanaman Tiang', 'Penarikan KU Fiber', 'Instalasi ODP & Splicing', 'Testing & ATP'];
+    milestones_config = stageNames.map((stName, idx) => {
+      const type = document.querySelector(`input[name="mix_type_${idx}"]:checked`)?.value || 'Mandor';
+      const execId = document.getElementById(`mix-exec-${idx}`)?.value || '';
+      const cost = type === 'Mandor' ? (Number(document.getElementById(`mix-cost-${idx}`)?.value) || 0) : 0;
+      return {
+        stage_name: stName,
+        executor_type: type,
+        executor_id: execId,
+        stage_cost: cost
+      };
+    });
+    executor_id = 'MIXED';
+    calcTotalMixingCost();
+    mandor_cost = document.getElementById('modal-mandor-cost').value;
+  }
 
   try {
     const res = await fetch('/api/projects', {
@@ -1975,7 +2158,8 @@ async function submitNewProject(e) {
         executor_id,
         contract_value,
         mandor_cost,
-        target_date
+        target_date,
+        milestones_config
       })
     });
     if (res.ok) {

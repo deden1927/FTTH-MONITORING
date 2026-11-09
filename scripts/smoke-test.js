@@ -449,6 +449,101 @@ async function waitForServer(timeoutMs = 10000) {
     check('DELETE SP dengan pekerjaan aktif -> 400 Bad Request', delSpBlocked.status === 400);
 
     // =============================================================
+    // FITUR EKSEKUTOR HYBRID / MIXING PER-MILESTONE
+    // =============================================================
+    const mixMandorRes = await req('POST', '/api/executors', {
+      name: 'Mandor Mixing Tarik',
+      type: 'Mandor',
+      phone: '0812-9911-2233',
+      pic: 'Mandor Tarik',
+      wilayah: 'Gresik',
+      status: 'Aktif'
+    }, PM_AUTH);
+    const mixMandorId = mixMandorRes.body.executor.id;
+
+    const mixInternalRes = await req('POST', '/api/executors', {
+      name: 'Tim Internal Splicing Delta',
+      type: 'Internal',
+      phone: '0813-8822-4455',
+      pic: 'Koor Splicer',
+      wilayah: 'Surabaya',
+      status: 'Aktif'
+    }, PM_AUTH);
+    const mixInternalId = mixInternalRes.body.executor.id;
+
+    const mixedProjRes = await req('POST', '/api/projects', {
+      sp_number: 'SP-MIXING-FTTH-001',
+      job_name: 'Pekerjaan FTTH Campuran Gresik',
+      client_name: 'Telkom Akses',
+      executor_type: 'Campuran',
+      contract_value: 80000000,
+      target_date: '2026-12-31',
+      milestones_config: [
+        {
+          stage_name: 'Penanaman Tiang',
+          executor_type: 'Mandor',
+          executor_id: mixMandorId,
+          stage_cost: 15000000
+        },
+        {
+          stage_name: 'Penarikan KU Fiber',
+          executor_type: 'Mandor',
+          executor_id: mixMandorId,
+          stage_cost: 25000000
+        },
+        {
+          stage_name: 'Instalasi ODP & Splicing',
+          executor_type: 'Internal',
+          executor_id: mixInternalId,
+          stage_cost: 0
+        },
+        {
+          stage_name: 'Testing & ATP',
+          executor_type: 'Internal',
+          executor_id: mixInternalId,
+          stage_cost: 0
+        }
+      ]
+    }, PM_AUTH);
+    check('POST /api/projects Campuran -> 201', mixedProjRes.status === 201);
+    const mixedProj = mixedProjRes.body;
+    check('Project Campuran auto-sum mandor_cost (40.000.000)', mixedProj.mandor_cost === 40000000);
+    check('Project Campuran memiliki executor_type Campuran', mixedProj.executor_type === 'Campuran');
+
+    const getMixedList = await req('GET', `/api/projects?client=Telkom Akses`, null, AUTH);
+    const foundMixed = getMixedList.body.find(p => p.id === mixedProj.id);
+    check('GET /api/projects memuat 4 milestone dengan executor masing-masing', !!foundMixed && foundMixed.milestones.length === 4);
+    const m1 = foundMixed.milestones.find(m => m.stage_name === 'Penanaman Tiang');
+    const m3 = foundMixed.milestones.find(m => m.stage_name === 'Instalasi ODP & Splicing');
+    check('Milestone 1 disimpan dengan Mandor & stage_cost 15jt', !!m1 && m1.executor_type === 'Mandor' && m1.executor_name === 'Mandor Mixing Tarik' && m1.stage_cost === 15000000);
+    check('Milestone 3 disimpan dengan Internal & stage_cost 0', !!m3 && m3.executor_type === 'Internal' && m3.executor_name === 'Tim Internal Splicing Delta' && m3.stage_cost === 0);
+
+    // PUT /api/milestones/:id dapat mengupdate executor tahapan
+    const putMilestoneRes = await req('PUT', `/api/milestones/${m1.id}`, {
+      status: 'In-Progress',
+      stage_cost: 16000000
+    }, PM_AUTH);
+    check('PUT /api/milestones/:id update stage_cost -> 200', putMilestoneRes.status === 200 && putMilestoneRes.body.stage_cost === 16000000);
+
+    // Proteksi DELETE eksekutor yang aktif di milestone pengerjaan
+    const delMixMandorBlocked = await req('DELETE', `/api/executors/${mixMandorId}`, null, AUTH);
+    check('DELETE eksekutor aktif di milestone -> 400 Bad Request', delMixMandorBlocked.status === 400);
+
+    // SOP Anti-Boncos: Ketika seluruh milestone Done, kas keluar hanya dibuat untuk Mandor (bukan internal)
+    for (const ms of foundMixed.milestones) {
+      await req('PUT', `/api/milestones/${ms.id}`, { status: 'Done', progress_percent: 100 }, PM_AUTH);
+    }
+    const payoutsListRes = await req('GET', '/api/mandor-payouts', null, FIN_AUTH);
+    const autoPayouts = payoutsListRes.body.filter(p => p.project_id === mixedProj.id);
+    check('Auto-payout SOP Anti-Boncos hanya terbit untuk Mandor', autoPayouts.length === 1 && autoPayouts[0].mandor_name === 'Mandor Mixing Tarik');
+    check('Auto-payout nominal sesuai akumulasi upah mandor (41 jt)', autoPayouts[0].amount === 41000000);
+
+    // Dashboard Stats menghitung mixedCount & mixedValue
+    const statsMixedRes = await req('GET', '/api/dashboard/stats', null, AUTH);
+    check('Dashboard stats menghitung mixedCount >= 1', statsMixedRes.body.executorBreakdown.mixedCount >= 1);
+    check('Dashboard stats menghitung mixedValue >= 80jt', statsMixedRes.body.executorBreakdown.mixedValue >= 80000000);
+
+    // =============================================================
     // FITUR MODE GELAP (DARK MODE) INTEGRITY TEST
     // =============================================================
     const dashHtmlRes = await req('GET', '/dashboard.html', null, null);

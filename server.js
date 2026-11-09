@@ -109,6 +109,8 @@ function readDB() {
     if (!Array.isArray(parsed.material_inbounds)) parsed.material_inbounds = [];
     if (!Array.isArray(parsed.materials)) parsed.materials = [];
     if (!Array.isArray(parsed.bon_material)) parsed.bon_material = [];
+    if (!Array.isArray(parsed.milestones)) parsed.milestones = [];
+    if (!Array.isArray(parsed.executors)) parsed.executors = [];
 
     // Auto-normalisasi data projects ke dalam relasi SP/PO (1 SP to N Pekerjaan)
     let needSync = false;
@@ -135,6 +137,20 @@ function readDB() {
       if (!p.sp_id) {
         p.sp_id = existingSp.id;
         needSync = true;
+      }
+    });
+
+    // Auto-normalisasi data milestones (dukungan executor hybrid / mixing per milestone)
+    parsed.milestones.forEach(m => {
+      const parentProj = parsed.projects.find(p => p.id === m.project_id);
+      if (parentProj) {
+        if (!m.executor_type) { m.executor_type = parentProj.executor_type || 'Mandor'; needSync = true; }
+        if (m.executor_id === undefined) { m.executor_id = parentProj.executor_id || ''; needSync = true; }
+        if (!m.executor_name) { m.executor_name = parentProj.executor_name || 'Belum Ditentukan'; needSync = true; }
+        if (m.stage_cost === undefined || m.stage_cost === null) {
+          m.stage_cost = parentProj.executor_type === 'Mandor' ? Math.round((Number(parentProj.mandor_cost) || 0) / 4) : 0;
+          needSync = true;
+        }
       }
     });
 
@@ -419,12 +435,14 @@ app.get('/api/dashboard/stats', authenticateToken, (req, res) => {
     clientPortfolio[p.client_name] = (clientPortfolio[p.client_name] || 0) + p.contract_value;
   });
 
-  // Executor Breakdown (Internal vs Mandor)
+  // Executor Breakdown (Internal vs Mandor vs Campuran)
   const executorBreakdown = {
-    internalValue: (db.projects || []).filter(p => p.executor_type === 'Internal').reduce((a, b) => a + b.contract_value, 0),
-    mandorValue: (db.projects || []).filter(p => p.executor_type === 'Mandor').reduce((a, b) => a + b.contract_value, 0),
+    internalValue: (db.projects || []).filter(p => p.executor_type === 'Internal').reduce((a, b) => a + (Number(b.contract_value) || 0), 0),
+    mandorValue: (db.projects || []).filter(p => p.executor_type === 'Mandor').reduce((a, b) => a + (Number(b.contract_value) || 0), 0),
+    mixedValue: (db.projects || []).filter(p => p.executor_type === 'Campuran').reduce((a, b) => a + (Number(b.contract_value) || 0), 0),
     internalCount: (db.projects || []).filter(p => p.executor_type === 'Internal').length,
-    mandorCount: (db.projects || []).filter(p => p.executor_type === 'Mandor').length
+    mandorCount: (db.projects || []).filter(p => p.executor_type === 'Mandor').length,
+    mixedCount: (db.projects || []).filter(p => p.executor_type === 'Campuran').length
   };
 
   // Status Milestones count
@@ -530,7 +548,14 @@ app.get('/api/projects', authenticateToken, (req, res) => {
   const { client, executor_type, status } = req.query;
 
   let list = (db.projects || []).map(proj => {
-    const projMilestones = (db.milestones || []).filter(m => m.project_id === proj.id);
+    let projMilestones = (db.milestones || []).filter(m => m.project_id === proj.id);
+    projMilestones = projMilestones.map(m => ({
+      ...m,
+      executor_type: m.executor_type || proj.executor_type || 'Mandor',
+      executor_id: m.executor_id || proj.executor_id || '',
+      executor_name: m.executor_name || proj.executor_name || 'Belum Ditentukan',
+      stage_cost: m.stage_cost !== undefined ? Number(m.stage_cost) : (proj.executor_type === 'Mandor' ? Math.round((Number(proj.mandor_cost) || 0) / 4) : 0)
+    }));
     const completedM = projMilestones.filter(m => m.status === 'Done').length;
     const totalM = projMilestones.length || 4;
     const progress = Math.round((completedM / totalM) * 100);
@@ -567,7 +592,8 @@ app.post('/api/projects', authenticateToken, requireRoles(['direktur', 'superadm
     executor_id,
     contract_value,
     mandor_cost,
-    target_date
+    target_date,
+    milestones_config
   } = req.body;
 
   const rawSp = String(sp_number || wo_number || '').trim();
@@ -594,11 +620,82 @@ app.post('/api/projects', authenticateToken, requireRoles(['direktur', 'superadm
 
   const executor = (db.executors || []).find(e => e.id === executor_id) || { name: 'Belum Ditentukan' };
   const val = Number(contract_value) || 0;
-  const cost = Number(mandor_cost) || 0;
+  let cost = Number(mandor_cost) || 0;
+
+  const newProjId = 'proj-' + (Date.now());
+
+  // Setup default 4 milestone templates
+  const standardStages = [
+    { stage_name: 'Penanaman Tiang', notes: 'Penyiapan perizinan ROW & koordinasi mandor.' },
+    { stage_name: 'Penarikan KU Fiber', notes: 'Menunggu alokasi drum kabel fiber.' },
+    { stage_name: 'Instalasi ODP & Splicing', notes: 'Menunggu kabel KU selesai ditarik.' },
+    { stage_name: 'Testing & ATP', notes: 'Uji OTDR & OPM setelah seluruh ODP terpasang.', otdr_loss: '-', opm_power: '-' }
+  ];
+
+  let calculatedMilestones = [];
+  let finalExecType = executor_type || 'Mandor';
+  let finalExecId = executor_id || '';
+  let finalExecName = executor.name;
+
+  if (finalExecType === 'Campuran' || Array.isArray(milestones_config)) {
+    finalExecType = 'Campuran';
+    finalExecId = 'MIXED';
+    let sumMandorCost = 0;
+    const execNames = [];
+
+    calculatedMilestones = standardStages.map((st, idx) => {
+      const cfg = (Array.isArray(milestones_config) ? (milestones_config.find(c => c.stage_name === st.stage_name) || milestones_config[idx]) : null) || {};
+      const mExecId = cfg.executor_id || '';
+      const mExec = (db.executors || []).find(e => e.id === mExecId);
+      const mType = cfg.executor_type || (mExec ? mExec.type : 'Mandor');
+      const mName = mExec ? mExec.name : (cfg.executor_name || (mType === 'Internal' ? 'Tim Internal PT AKU' : 'Mandor Borongan'));
+      const mCost = mType === 'Mandor' ? (Number(cfg.stage_cost) || 0) : 0;
+      if (mType === 'Mandor') {
+        sumMandorCost += mCost;
+      }
+      if (mName && !execNames.includes(mName)) execNames.push(mName);
+
+      return {
+        id: `m-${newProjId}-${idx + 1}`,
+        project_id: newProjId,
+        stage_name: st.stage_name,
+        status: 'To-Do',
+        progress_percent: 0,
+        notes: cfg.notes || st.notes,
+        blocked_reason: '',
+        otdr_loss: st.otdr_loss || '',
+        opm_power: st.opm_power || '',
+        executor_type: mType,
+        executor_id: mExecId,
+        executor_name: mName,
+        stage_cost: mCost
+      };
+    });
+
+    cost = sumMandorCost;
+    finalExecName = execNames.length > 0 ? execNames.join(' & ') : 'Campuran (Internal & Mandor)';
+  } else {
+    const perStageCost = finalExecType === 'Mandor' ? Math.round(cost / 4) : 0;
+    calculatedMilestones = standardStages.map((st, idx) => ({
+      id: `m-${newProjId}-${idx + 1}`,
+      project_id: newProjId,
+      stage_name: st.stage_name,
+      status: 'To-Do',
+      progress_percent: 0,
+      notes: st.notes,
+      blocked_reason: '',
+      otdr_loss: st.otdr_loss || '',
+      opm_power: st.opm_power || '',
+      executor_type: finalExecType,
+      executor_id: finalExecId,
+      executor_name: finalExecName,
+      stage_cost: perStageCost
+    }));
+  }
+
   const margin = val - cost;
   const marginPct = val > 0 ? Number(((margin / val) * 100).toFixed(1)) : 0;
 
-  const newProjId = 'proj-' + (Date.now());
   const newProject = {
     id: newProjId,
     sp_id: spOrder.id,
@@ -607,9 +704,9 @@ app.post('/api/projects', authenticateToken, requireRoles(['direktur', 'superadm
     wo_number: spOrder.sp_number, // Backward compatibility
     cluster_name: rawJob,         // Backward compatibility
     client_name: spOrder.client_name,
-    executor_type: executor_type || 'Mandor',
-    executor_id: executor_id || '',
-    executor_name: executor.name,
+    executor_type: finalExecType,
+    executor_id: finalExecId,
+    executor_name: finalExecName,
     contract_value: val,
     mandor_cost: cost,
     gross_margin: margin,
@@ -619,58 +716,11 @@ app.post('/api/projects', authenticateToken, requireRoles(['direktur', 'superadm
     created_at: new Date().toISOString().split('T')[0]
   };
 
-  const defaultMilestones = [
-    {
-      id: `m-${newProjId}-1`,
-      project_id: newProjId,
-      stage_name: 'Penanaman Tiang',
-      status: 'To-Do',
-      progress_percent: 0,
-      notes: 'Penyiapan perizinan ROW & koordinasi mandor.',
-      blocked_reason: '',
-      otdr_loss: '',
-      opm_power: ''
-    },
-    {
-      id: `m-${newProjId}-2`,
-      project_id: newProjId,
-      stage_name: 'Penarikan KU Fiber',
-      status: 'To-Do',
-      progress_percent: 0,
-      notes: 'Menunggu alokasi drum kabel fiber.',
-      blocked_reason: '',
-      otdr_loss: '',
-      opm_power: ''
-    },
-    {
-      id: `m-${newProjId}-3`,
-      project_id: newProjId,
-      stage_name: 'Instalasi ODP & Splicing',
-      status: 'To-Do',
-      progress_percent: 0,
-      notes: 'Menunggu kabel KU selesai ditarik.',
-      blocked_reason: '',
-      otdr_loss: '',
-      opm_power: ''
-    },
-    {
-      id: `m-${newProjId}-4`,
-      project_id: newProjId,
-      stage_name: 'Testing & ATP',
-      status: 'To-Do',
-      progress_percent: 0,
-      notes: 'Uji OTDR & OPM setelah seluruh ODP terpasang.',
-      blocked_reason: '',
-      otdr_loss: '-',
-      opm_power: '-'
-    }
-  ];
-
   if (!db.projects) db.projects = [];
   if (!db.milestones) db.milestones = [];
 
   db.projects.push(newProject);
-  db.milestones.push(...defaultMilestones);
+  db.milestones.push(...calculatedMilestones);
   if (!db.bon_material) db.bon_material = [];
   db.bon_material.push({
     id: 'bon-' + newProjId,
@@ -716,13 +766,36 @@ app.put('/api/milestones/:id', authenticateToken, requireRoles(['pm', 'superadmi
     return res.status(404).json({ error: 'Milestone not found' });
   }
 
-  const { status, progress_percent, notes, blocked_reason, otdr_loss, opm_power } = req.body;
+  const {
+    status,
+    progress_percent,
+    notes,
+    blocked_reason,
+    otdr_loss,
+    opm_power,
+    executor_type,
+    executor_id,
+    executor_name,
+    stage_cost
+  } = req.body;
+
   if (status) db.milestones[mIndex].status = status;
   if (progress_percent !== undefined) db.milestones[mIndex].progress_percent = Number(progress_percent);
   if (notes !== undefined) db.milestones[mIndex].notes = String(notes);
   if (blocked_reason !== undefined) db.milestones[mIndex].blocked_reason = String(blocked_reason);
   if (otdr_loss !== undefined) db.milestones[mIndex].otdr_loss = String(otdr_loss);
   if (opm_power !== undefined) db.milestones[mIndex].opm_power = String(opm_power);
+  if (executor_type !== undefined) db.milestones[mIndex].executor_type = executor_type;
+  if (executor_id !== undefined) {
+    db.milestones[mIndex].executor_id = executor_id;
+    const foundExec = (db.executors || []).find(e => e.id === executor_id);
+    if (foundExec) {
+      db.milestones[mIndex].executor_name = foundExec.name;
+      if (!executor_type) db.milestones[mIndex].executor_type = foundExec.type;
+    }
+  }
+  if (executor_name !== undefined) db.milestones[mIndex].executor_name = String(executor_name);
+  if (stage_cost !== undefined) db.milestones[mIndex].stage_cost = Number(stage_cost) || 0;
 
   // Auto-update overall project status based on milestones
   const pId = db.milestones[mIndex].project_id;
@@ -730,24 +803,61 @@ app.put('/api/milestones/:id', authenticateToken, requireRoles(['pm', 'superadmi
   const pIndex = (db.projects || []).findIndex(p => p.id === pId);
 
   if (pIndex !== -1) {
+    // Sinkronkan kembali mandor_cost dan executor_type pada level project
+    const mandorStages = pMilestones.filter(m => m.executor_type === 'Mandor');
+    const internalStages = pMilestones.filter(m => m.executor_type === 'Internal');
+    if (mandorStages.length > 0 && internalStages.length > 0) {
+      db.projects[pIndex].executor_type = 'Campuran';
+      db.projects[pIndex].mandor_cost = mandorStages.reduce((sum, m) => sum + (Number(m.stage_cost) || 0), 0);
+    } else if (mandorStages.length > 0) {
+      db.projects[pIndex].executor_type = 'Mandor';
+      db.projects[pIndex].mandor_cost = mandorStages.reduce((sum, m) => sum + (Number(m.stage_cost) || 0), 0);
+    } else if (internalStages.length > 0) {
+      db.projects[pIndex].executor_type = 'Internal';
+      db.projects[pIndex].mandor_cost = 0;
+    }
+    const val = Number(db.projects[pIndex].contract_value) || 0;
+    const cost = Number(db.projects[pIndex].mandor_cost) || 0;
+    db.projects[pIndex].gross_margin = val - cost;
+    db.projects[pIndex].margin_percent = val > 0 ? Number((((val - cost) / val) * 100).toFixed(1)) : 0;
+
     if (pMilestones.some(m => m.status === 'Blocked')) {
       db.projects[pIndex].status = 'Blocked';
     } else if (pMilestones.every(m => m.status === 'Done')) {
       db.projects[pIndex].status = 'Done';
 
-      // SOP Penguncian Anti Boncos: Auto-create Kas Keluar
+      // SOP Penguncian Anti Boncos: Auto-create Kas Keluar HANYA untuk Mandor
       if (!db.mandor_payouts) db.mandor_payouts = [];
-      const existingPayout = db.mandor_payouts.find(p => p.project_id === pId);
-      if (!existingPayout) {
-        db.mandor_payouts.push({
-          id: 'pay-' + Date.now(),
-          project_id: pId,
-          mandor_name: db.projects[pIndex].executor_name,
-          milestone_stage: 'Pekerjaan Selesai (100%)',
-          amount: db.projects[pIndex].mandor_cost,
-          status: 'Menunggu Verifikasi PM',
-          verified_by_pm: false,
-          notes: 'Dibuat otomatis oleh sistem saat semua milestone Done (SOP Anti Boncos)'
+      if (mandorStages.length > 0) {
+        // Kelompokkan per mandor
+        const mandorGroups = {};
+        mandorStages.forEach(st => {
+          const mKey = st.executor_id || st.executor_name || db.projects[pIndex].executor_name || 'Mandor Lapangan';
+          if (!mandorGroups[mKey]) {
+            mandorGroups[mKey] = {
+              mandor_name: st.executor_name || db.projects[pIndex].executor_name || 'Mandor Lapangan',
+              total_cost: 0
+            };
+          }
+          mandorGroups[mKey].total_cost += (Number(st.stage_cost) || 0);
+        });
+
+        Object.values(mandorGroups).forEach(grp => {
+          if (grp.total_cost > 0) {
+            const existingPayout = db.mandor_payouts.find(p => p.project_id === pId && p.mandor_name === grp.mandor_name);
+            if (!existingPayout) {
+              db.mandor_payouts.push({
+                id: 'pay-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+                project_id: pId,
+                mandor_name: grp.mandor_name,
+                milestone_stage: 'Pekerjaan Selesai (100%)',
+                amount: grp.total_cost,
+                status: 'Menunggu Verifikasi PM',
+                verified_by_pm: false,
+                notes: 'Dibuat otomatis oleh sistem saat semua milestone Done (SOP Anti Boncos)'
+              });
+            }
+          }
         });
       }
     } else if (pMilestones.some(m => m.status === 'In-Progress' || m.status === 'Done')) {
@@ -1037,13 +1147,18 @@ app.delete('/api/executors/:id', authenticateToken, requireRoles(['direktur', 's
   if (index === -1) return res.status(404).json({ success: false, message: 'Eksekutor tidak ditemukan.' });
 
   const executor = db.executors[index];
-  const activeProjects = (db.projects || []).filter(p =>
-    (p.executor_id === id || p.executor_name === executor.name) &&
-    p.status !== 'Selesai' && p.status !== 'Done'
-  );
+  const activeProjects = (db.projects || []).filter(p => {
+    const isDirectMatch = (p.executor_id === id || p.executor_name === executor.name);
+    const hasActiveMilestone = (db.milestones || []).some(m =>
+      m.project_id === p.id &&
+      (m.executor_id === id || m.executor_name === executor.name) &&
+      m.status !== 'Done'
+    );
+    return (isDirectMatch || hasActiveMilestone) && p.status !== 'Selesai' && p.status !== 'Done';
+  });
 
   if (activeProjects.length > 0) {
-    const activeWoList = activeProjects.map(p => p.wo_number).join(', ');
+    const activeWoList = activeProjects.map(p => p.wo_number || p.sp_number).join(', ');
     return res.status(400).json({
       success: false,
       message: `Tidak dapat menghapus eksekutor "${executor.name}" karena masih memiliki ${activeProjects.length} WO aktif (${activeWoList}). Alihkan atau selesaikan WO tersebut terlebih dahulu.`
