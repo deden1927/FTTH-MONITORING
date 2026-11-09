@@ -369,6 +369,11 @@ async function waitForServer(timeoutMs = 10000) {
     const statsRes = await req('GET', '/api/dashboard/stats', null, AUTH);
     check('GET /api/dashboard/stats -> 200', statsRes.status === 200);
     check('monthlyRevenue adalah array 6 bulan', Array.isArray(statsRes.body.monthlyRevenue) && statsRes.body.monthlyRevenue.length === 6);
+    check('revenueTrends memuat periode 3m, 6m, 1y', !!statsRes.body.revenueTrends && statsRes.body.revenueTrends['3m'].length === 3 && statsRes.body.revenueTrends['6m'].length === 6 && statsRes.body.revenueTrends['1y'].length === 12);
+    const stats3m = await req('GET', '/api/dashboard/stats?months=3', null, AUTH);
+    check('GET /api/dashboard/stats?months=3 -> 3 bulan', stats3m.body.monthlyRevenue.length === 3);
+    const stats1y = await req('GET', '/api/dashboard/stats?months=12', null, AUTH);
+    check('GET /api/dashboard/stats?months=12 -> 12 bulan (1 tahun)', stats1y.body.monthlyRevenue.length === 12);
     const targetMonth = statsRes.body.monthlyRevenue.find(m => m.key === '2026-11');
     check('monthlyRevenue 2026-11 menghitung billed dinamis (>= 75 jt)', !!targetMonth && targetMonth.billed >= 75000000);
     check('monthlyRevenue 2026-11 menghitung received dinamis (>= 75 jt)', !!targetMonth && targetMonth.received >= 75000000);

@@ -402,7 +402,14 @@ async function loadDashboardStats() {
     document.getElementById('kpi-margin-pct').innerText = `Margin: ${stats.grossMarginPercent}% dari Omset`;
     document.getElementById('kpi-project-count').innerText = `${stats.activeProjectsCount} Proyek Berjalan`;
 
-    renderRevenueChart(stats.monthlyRevenue);
+    revenueTrendsData = stats.revenueTrends || {
+      '3m': (stats.monthlyRevenue || []).slice(-3),
+      '6m': stats.monthlyRevenue || [],
+      '1y': stats.monthlyRevenue || []
+    };
+    renderRevenueForCurrentPeriod();
+    updateRevenuePeriodButtons();
+
     renderClientChart(stats.clientPortfolio);
     renderAgingTable();
     renderExecutorSummary(stats.executorBreakdown);
@@ -411,9 +418,45 @@ async function loadDashboardStats() {
   }
 }
 
+let currentRevenuePeriod = '6m';
+let revenueTrendsData = null;
+
+function getRevenueDataForPeriod(period) {
+  if (revenueTrendsData && Array.isArray(revenueTrendsData[period])) {
+    return revenueTrendsData[period];
+  }
+  return [];
+}
+
+function renderRevenueForCurrentPeriod() {
+  const data = getRevenueDataForPeriod(currentRevenuePeriod);
+  if (data && data.length > 0) {
+    renderRevenueChart(data);
+  }
+}
+
+function setRevenuePeriod(period) {
+  if (!['3m', '6m', '1y'].includes(period)) return;
+  currentRevenuePeriod = period;
+  updateRevenuePeriodButtons();
+  renderRevenueForCurrentPeriod();
+}
+
+function updateRevenuePeriodButtons() {
+  ['3m', '6m', '1y'].forEach(p => {
+    const btn = document.getElementById(`btn-rev-${p}`);
+    if (!btn) return;
+    if (p === currentRevenuePeriod) {
+      btn.className = 'px-2.5 py-1 text-xs font-semibold rounded-md transition cursor-pointer bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-2xs';
+    } else {
+      btn.className = 'px-2.5 py-1 text-xs font-semibold rounded-md transition cursor-pointer text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100';
+    }
+  });
+}
+
 function renderRevenueChart(monthlyData) {
   const ctx = document.getElementById('revenueChart');
-  if (!ctx) return;
+  if (!ctx || !Array.isArray(monthlyData)) return;
 
   const labels = monthlyData.map(d => d.month);
   const billedData = monthlyData.map(d => d.billed / 1000000); // in Millions

@@ -394,40 +394,52 @@ app.get('/api/dashboard/stats', authenticateToken, (req, res) => {
   });
 
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
-  const monthlyRevenue = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(maxYear, maxMonth - i, 1);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const key = `${yyyy}-${mm}`;
-    const monthLabel = monthNames[d.getMonth()];
 
-    // Omset Tagihan (Billed): invoice yang diterbitkan pada bulan tersebut (kecuali Draft)
-    const billed = (db.invoices || [])
-      .filter(inv => {
-        if (inv.status === 'Draft') return false;
-        const dt = inv.invoice_date || '';
-        return dt.startsWith(key);
-      })
-      .reduce((sum, inv) => sum + (Number(inv.amount) || 0), 0);
+  function buildMonthlyRevenue(count) {
+    const list = [];
+    for (let i = count - 1; i >= 0; i--) {
+      const d = new Date(maxYear, maxMonth - i, 1);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const key = `${yyyy}-${mm}`;
+      const monthLabel = count > 6 ? `${monthNames[d.getMonth()]} '${String(yyyy).slice(-2)}` : monthNames[d.getMonth()];
 
-    // Kas Riil Masuk (Received): invoice lunas/cashbank pada bulan uang masuk (paid_date)
-    const received = (db.invoices || [])
-      .filter(inv => {
-        const isPaid = inv.status === 'Sudah Cashbank' || inv.status === 'Lunas';
-        if (!isPaid) return false;
-        const dt = inv.paid_date || inv.invoice_date || '';
-        return dt.startsWith(key);
-      })
-      .reduce((sum, inv) => sum + (Number(inv.amount) || 0), 0);
+      // Omset Tagihan (Billed): invoice yang diterbitkan pada bulan tersebut (kecuali Draft)
+      const billed = (db.invoices || [])
+        .filter(inv => {
+          if (inv.status === 'Draft') return false;
+          const dt = inv.invoice_date || '';
+          return dt.startsWith(key);
+        })
+        .reduce((sum, inv) => sum + (Number(inv.amount) || 0), 0);
 
-    monthlyRevenue.push({
-      month: monthLabel,
-      key,
-      billed,
-      received
-    });
+      // Kas Riil Masuk (Received): invoice lunas/cashbank pada bulan uang masuk (paid_date)
+      const received = (db.invoices || [])
+        .filter(inv => {
+          const isPaid = inv.status === 'Sudah Cashbank' || inv.status === 'Lunas';
+          if (!isPaid) return false;
+          const dt = inv.paid_date || inv.invoice_date || '';
+          return dt.startsWith(key);
+        })
+        .reduce((sum, inv) => sum + (Number(inv.amount) || 0), 0);
+
+      list.push({
+        month: monthLabel,
+        key,
+        billed,
+        received
+      });
+    }
+    return list;
   }
+
+  const requestedMonths = [3, 6, 12].includes(Number(req.query.months)) ? Number(req.query.months) : 6;
+  const monthlyRevenue = buildMonthlyRevenue(requestedMonths);
+  const revenueTrends = {
+    '3m': buildMonthlyRevenue(3),
+    '6m': buildMonthlyRevenue(6),
+    '1y': buildMonthlyRevenue(12)
+  };
 
   // Portofolio Klien
   const clientPortfolio = {};
@@ -461,6 +473,7 @@ app.get('/api/dashboard/stats', authenticateToken, (req, res) => {
     grossMarginPercent,
     activeProjectsCount: (db.projects || []).length,
     monthlyRevenue,
+    revenueTrends,
     clientPortfolio,
     executorBreakdown,
     milestoneCounts
