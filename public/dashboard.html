@@ -16,7 +16,7 @@
   <meta property="og:type" content="website">
   <!-- Theme Detection Script (Zero FOUC) -->
   <script>
-    (function() {
+    (function () {
       try {
         const savedTheme = localStorage.getItem('theme');
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -25,7 +25,7 @@
         } else {
           document.documentElement.classList.remove('dark');
         }
-      } catch (e) {}
+      } catch (e) { }
     })();
   </script>
   <!-- Tailwind CSS CDN -->
@@ -110,6 +110,7 @@
     .dark .bg-white {
       background-color: #0f172a !important;
     }
+
     .dark .bg-slate-50,
     .dark .bg-slate-50\/50,
     .dark .bg-slate-50\/70,
@@ -117,34 +118,43 @@
     .dark .bg-slate-100\/60 {
       background-color: #1e293b !important;
     }
+
     .dark .border-slate-100,
     .dark .border-slate-200,
     .dark .border-slate-200\/80,
     .dark .border-slate-200\/90 {
       border-color: #334155 !important;
     }
+
     .dark .border-slate-300 {
       border-color: #475569 !important;
     }
+
     .dark .text-slate-900 {
       color: #f8fafc !important;
     }
+
     .dark .text-slate-800 {
       color: #e2e8f0 !important;
     }
+
     .dark .text-slate-700 {
       color: #cbd5e1 !important;
     }
+
     .dark .text-slate-600 {
       color: #94a3b8 !important;
     }
+
     .dark .text-slate-500 {
       color: #64748b !important;
     }
-    .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
-    .dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+
+    .dark .divide-slate-100> :not([hidden])~ :not([hidden]),
+    .dark .divide-slate-200> :not([hidden])~ :not([hidden]) {
       border-color: #334155 !important;
     }
+
     .dark input:not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]),
     .dark select,
     .dark textarea {
@@ -152,21 +162,25 @@
       color: #f1f5f9 !important;
       border-color: #475569 !important;
     }
+
     .dark input::placeholder,
     .dark textarea::placeholder {
       color: #64748b !important;
     }
+
     .dark tr:hover {
       background-color: rgba(30, 41, 59, 0.7) !important;
     }
   </style>
 </head>
 
-<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans antialiased min-h-screen transition-colors duration-200">
+<body
+  class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans antialiased min-h-screen transition-colors duration-200">
 
   <!-- LOGIN CONTAINER -->
   <div id="login-container" class="flex-1 flex items-center justify-center min-h-screen bg-slate-900">
-    <div class="bg-white dark:bg-slate-900 p-8 rounded-xl shadow-2xl w-full max-w-md border border-transparent dark:border-slate-800">
+    <div
+      class="bg-white dark:bg-slate-900 p-8 rounded-xl shadow-2xl w-full max-w-md border border-transparent dark:border-slate-800">
       <div class="text-center mb-6">
         <img src="/images/logo.png" alt="Logo PT Akses Kwalitas Unggul"
           class="h-20 w-auto object-contain mx-auto mb-4 drop-shadow-md">
@@ -196,7 +210,8 @@
   </div>
 
   <!-- MAIN APP CONTAINER (SIDEBAR + MAIN CONTENT) -->
-  <div id="app-container" style="display: none;" class="min-h-screen flex bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100">
+  <div id="app-container" style="display: none;"
+    class="min-h-screen flex bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100">
 
     <!-- MOBILE SIDEBAR BACKDROP -->
     <div id="sidebar-backdrop" onclick="toggleSidebar(false)"
@@ -321,7 +336,8 @@
     <div class="flex-1 flex flex-col min-w-0 min-h-screen">
 
       <!-- TOPBAR HEADER -->
-      <header class="bg-white dark:bg-slate-900 sticky top-0 z-30 shadow-xs border-b border-slate-200 dark:border-slate-800 transition-colors duration-200">
+      <header
+        class="bg-white dark:bg-slate-900 sticky top-0 z-30 shadow-xs border-b border-slate-200 dark:border-slate-800 transition-colors duration-200">
         <div class="px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
 
           <!-- Left: Hamburger button (mobile) + Page Title & Subtitle -->
@@ -332,9 +348,11 @@
               <i data-lucide="menu" class="w-5 h-5"></i>
             </button>
             <div class="min-w-0">
-              <h1 id="topbarPageTitle" class="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight truncate">
+              <h1 id="topbarPageTitle"
+                class="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight truncate">
                 Executive Dashboard</h1>
-              <p id="topbarPageSubtitle" class="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 truncate hidden sm:block">
+              <p id="topbarPageSubtitle"
+                class="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 truncate hidden sm:block">
                 Ringkasan performa pendapatan dan progres operasional FTTH</p>
             </div>
           </div>
@@ -541,7 +559,7 @@
             <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
               <div class="flex justify-between items-start">
                 <div>
-                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Kas Diterima YTD</p>
+                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Cashbank Masuk</p>
                   <h3 id="kpi-kasmasuk" class="text-2xl font-bold text-emerald-600 mt-1">Rp 0</h3>
                   <p class="text-xs text-emerald-600 mt-1 flex items-center gap-1">
                     <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
@@ -554,7 +572,7 @@
               </div>
               <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                 <span>Realisasi Kas Masuk</span>
-                <span class="font-semibold text-emerald-600">Inflow Riil</span>
+                <span class="font-semibold text-emerald-600">Kas Diterima</span>
               </div>
             </div>
 
@@ -562,9 +580,9 @@
             <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
               <div class="flex justify-between items-start">
                 <div>
-                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Sisa Piutang</p>
+                  <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Belum Cashbank</p>
                   <h3 id="kpi-piutang" class="text-2xl font-bold text-amber-600 mt-1">Rp 0</h3>
-                  <p class="text-xs text-amber-600 mt-1">Dalam Proses BAST / Aging</p>
+                  <p class="text-xs text-amber-600 mt-1">Menunggu Cashbank</p>
                 </div>
                 <div class="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
                   <i data-lucide="clock" class="w-5 h-5"></i>
@@ -601,11 +619,14 @@
             <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm lg:col-span-2">
               <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <div>
-                  <h2 class="font-bold text-base text-slate-900 dark:text-slate-100">Tren Revenue & Kas Masuk Bulanan</h2>
-                  <p class="text-xs text-slate-500 dark:text-slate-400">Perbandingan antara invoice yang ditagihkan vs kas riil masuk
+                  <h2 class="font-bold text-base text-slate-900 dark:text-slate-100">Tren Revenue & Kas Masuk Bulanan
+                  </h2>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">Perbandingan antara invoice yang ditagihkan vs
+                    kas riil masuk
                     rekening</p>
                 </div>
-                <div class="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0 self-start sm:self-auto">
+                <div
+                  class="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700 shrink-0 self-start sm:self-auto">
                   <button type="button" onclick="setRevenuePeriod('3m')" id="btn-rev-3m"
                     class="px-2.5 py-1 text-xs font-semibold rounded-md transition cursor-pointer text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100">
                     3 Bulan
@@ -843,10 +864,12 @@
 
           <!-- SUB-TAB 2: KAS KELUAR (OUTFLOW - MANDOR PAYOUT) -->
           <div id="sub-content-outflow" class="hidden space-y-4">
-            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-xl border border-slate-200">
+            <div
+              class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 rounded-xl border border-slate-200">
               <div>
                 <h3 class="font-bold text-slate-900 text-sm">Daftar Pengeluaran Upah Mandor & Kas Keluar</h3>
-                <p class="text-xs text-slate-500">Pencatatan kas keluar mandor, verifikasi fisik PM, dan otorisasi pencairan finance.</p>
+                <p class="text-xs text-slate-500">Pencatatan kas keluar mandor, verifikasi fisik PM, dan otorisasi
+                  pencairan finance.</p>
               </div>
               <button type="button" onclick="openModal('modalAddMandorPayout')"
                 class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow-xs transition cursor-pointer">
@@ -1183,7 +1206,8 @@
 
           <!-- Container Single Executor (Internal / Mandor Penuh) -->
           <div id="container-single-executor">
-            <label for="modal-executor-id" class="block font-semibold text-slate-700 mb-1">Pilih Eksekutor Terdaftar *</label>
+            <label for="modal-executor-id" class="block font-semibold text-slate-700 mb-1">Pilih Eksekutor Terdaftar
+              *</label>
             <select id="modal-executor-id" required
               class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white text-xs">
               <!-- Dynamically populated from executors -->
@@ -1200,68 +1224,83 @@
             <!-- 4 Milestone Rows -->
             <div class="space-y-2">
               <!-- 1. Tiang -->
-              <div class="p-2.5 bg-white rounded-lg border border-slate-200 space-y-1.5" data-mix-stage="Penanaman Tiang">
+              <div class="p-2.5 bg-white rounded-lg border border-slate-200 space-y-1.5"
+                data-mix-stage="Penanaman Tiang">
                 <div class="flex justify-between items-center">
                   <span class="font-bold text-slate-800 text-[11px]">1. Penanaman Tiang</span>
                   <div class="flex items-center gap-2">
                     <label class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 cursor-pointer">
-                      <input type="radio" name="mix_type_0" value="Mandor" checked onchange="onMixStageTypeChange(0)" class="text-sky-600"> Mandor
+                      <input type="radio" name="mix_type_0" value="Mandor" checked onchange="onMixStageTypeChange(0)"
+                        class="text-sky-600"> Mandor
                     </label>
                     <label class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 cursor-pointer">
-                      <input type="radio" name="mix_type_0" value="Internal" onchange="onMixStageTypeChange(0)" class="text-sky-600"> Internal
+                      <input type="radio" name="mix_type_0" value="Internal" onchange="onMixStageTypeChange(0)"
+                        class="text-sky-600"> Internal
                     </label>
                   </div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <select id="mix-exec-0" class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs bg-slate-50">
+                  <select id="mix-exec-0"
+                    class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs bg-slate-50">
                     <!-- populated -->
                   </select>
-                  <input type="number" id="mix-cost-0" placeholder="Porsi Upah Mandor (Rp)" oninput="calcTotalMixingCost()"
-                    class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs" value="0">
+                  <input type="number" id="mix-cost-0" placeholder="Porsi Upah Mandor (Rp)"
+                    oninput="calcTotalMixingCost()" class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs"
+                    value="0">
                 </div>
               </div>
 
               <!-- 2. KU Fiber -->
-              <div class="p-2.5 bg-white rounded-lg border border-slate-200 space-y-1.5" data-mix-stage="Penarikan KU Fiber">
+              <div class="p-2.5 bg-white rounded-lg border border-slate-200 space-y-1.5"
+                data-mix-stage="Penarikan KU Fiber">
                 <div class="flex justify-between items-center">
                   <span class="font-bold text-slate-800 text-[11px]">2. Penarikan KU Fiber</span>
                   <div class="flex items-center gap-2">
                     <label class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 cursor-pointer">
-                      <input type="radio" name="mix_type_1" value="Mandor" checked onchange="onMixStageTypeChange(1)" class="text-sky-600"> Mandor
+                      <input type="radio" name="mix_type_1" value="Mandor" checked onchange="onMixStageTypeChange(1)"
+                        class="text-sky-600"> Mandor
                     </label>
                     <label class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 cursor-pointer">
-                      <input type="radio" name="mix_type_1" value="Internal" onchange="onMixStageTypeChange(1)" class="text-sky-600"> Internal
+                      <input type="radio" name="mix_type_1" value="Internal" onchange="onMixStageTypeChange(1)"
+                        class="text-sky-600"> Internal
                     </label>
                   </div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <select id="mix-exec-1" class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs bg-slate-50">
+                  <select id="mix-exec-1"
+                    class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs bg-slate-50">
                     <!-- populated -->
                   </select>
-                  <input type="number" id="mix-cost-1" placeholder="Porsi Upah Mandor (Rp)" oninput="calcTotalMixingCost()"
-                    class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs" value="0">
+                  <input type="number" id="mix-cost-1" placeholder="Porsi Upah Mandor (Rp)"
+                    oninput="calcTotalMixingCost()" class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs"
+                    value="0">
                 </div>
               </div>
 
               <!-- 3. ODP & Splicing -->
-              <div class="p-2.5 bg-white rounded-lg border border-slate-200 space-y-1.5" data-mix-stage="Instalasi ODP & Splicing">
+              <div class="p-2.5 bg-white rounded-lg border border-slate-200 space-y-1.5"
+                data-mix-stage="Instalasi ODP & Splicing">
                 <div class="flex justify-between items-center">
                   <span class="font-bold text-slate-800 text-[11px]">3. Instalasi ODP & Splicing</span>
                   <div class="flex items-center gap-2">
                     <label class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 cursor-pointer">
-                      <input type="radio" name="mix_type_2" value="Mandor" onchange="onMixStageTypeChange(2)" class="text-sky-600"> Mandor
+                      <input type="radio" name="mix_type_2" value="Mandor" onchange="onMixStageTypeChange(2)"
+                        class="text-sky-600"> Mandor
                     </label>
                     <label class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 cursor-pointer">
-                      <input type="radio" name="mix_type_2" value="Internal" checked onchange="onMixStageTypeChange(2)" class="text-sky-600"> Internal
+                      <input type="radio" name="mix_type_2" value="Internal" checked onchange="onMixStageTypeChange(2)"
+                        class="text-sky-600"> Internal
                     </label>
                   </div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <select id="mix-exec-2" class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs bg-slate-50">
+                  <select id="mix-exec-2"
+                    class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs bg-slate-50">
                     <!-- populated -->
                   </select>
-                  <input type="number" id="mix-cost-2" placeholder="Porsi Upah Mandor (Rp)" oninput="calcTotalMixingCost()"
-                    class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs" value="0" disabled>
+                  <input type="number" id="mix-cost-2" placeholder="Porsi Upah Mandor (Rp)"
+                    oninput="calcTotalMixingCost()" class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs"
+                    value="0" disabled>
                 </div>
               </div>
 
@@ -1271,19 +1310,23 @@
                   <span class="font-bold text-slate-800 text-[11px]">4. Testing & ATP</span>
                   <div class="flex items-center gap-2">
                     <label class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 cursor-pointer">
-                      <input type="radio" name="mix_type_3" value="Mandor" onchange="onMixStageTypeChange(3)" class="text-sky-600"> Mandor
+                      <input type="radio" name="mix_type_3" value="Mandor" onchange="onMixStageTypeChange(3)"
+                        class="text-sky-600"> Mandor
                     </label>
                     <label class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 cursor-pointer">
-                      <input type="radio" name="mix_type_3" value="Internal" checked onchange="onMixStageTypeChange(3)" class="text-sky-600"> Internal
+                      <input type="radio" name="mix_type_3" value="Internal" checked onchange="onMixStageTypeChange(3)"
+                        class="text-sky-600"> Internal
                     </label>
                   </div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <select id="mix-exec-3" class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs bg-slate-50">
+                  <select id="mix-exec-3"
+                    class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs bg-slate-50">
                     <!-- populated -->
                   </select>
-                  <input type="number" id="mix-cost-3" placeholder="Porsi Upah Mandor (Rp)" oninput="calcTotalMixingCost()"
-                    class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs" value="0" disabled>
+                  <input type="number" id="mix-cost-3" placeholder="Porsi Upah Mandor (Rp)"
+                    oninput="calcTotalMixingCost()" class="w-full border border-slate-300 rounded-md px-2 py-1 text-xs"
+                    value="0" disabled>
                 </div>
               </div>
             </div>
@@ -1383,29 +1426,37 @@
         </div>
 
         <!-- Alokasi Eksekutor Tahapan Ini -->
-        <div class="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
+        <div
+          class="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
           <div class="flex items-center justify-between">
             <span class="font-bold text-slate-800 dark:text-slate-200 text-[11px] flex items-center gap-1.5">
               <i data-lucide="users" class="w-3.5 h-3.5 text-sky-600"></i> Penanggung Jawab Tahapan
             </span>
             <div class="flex items-center gap-2">
-              <label class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                <input type="radio" name="modal_m_exec_type" value="Mandor" onchange="onModalMilestoneExecTypeChange()" class="text-sky-600"> Mandor
+              <label
+                class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                <input type="radio" name="modal_m_exec_type" value="Mandor" onchange="onModalMilestoneExecTypeChange()"
+                  class="text-sky-600"> Mandor
               </label>
-              <label class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                <input type="radio" name="modal_m_exec_type" value="Internal" onchange="onModalMilestoneExecTypeChange()" class="text-sky-600"> Internal
+              <label
+                class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                <input type="radio" name="modal_m_exec_type" value="Internal"
+                  onchange="onModalMilestoneExecTypeChange()" class="text-sky-600"> Internal
               </label>
             </div>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
-              <label class="block text-slate-600 dark:text-slate-400 text-[10px] mb-0.5 font-medium">Pilih Tim / Mandor</label>
-              <select id="modal-m-exec-id" class="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-900 text-xs font-medium">
+              <label class="block text-slate-600 dark:text-slate-400 text-[10px] mb-0.5 font-medium">Pilih Tim /
+                Mandor</label>
+              <select id="modal-m-exec-id"
+                class="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-900 text-xs font-medium">
                 <!-- populated -->
               </select>
             </div>
             <div id="container-m-stage-cost">
-              <label class="block text-slate-600 dark:text-slate-400 text-[10px] mb-0.5 font-medium">Upah Mandor Tahapan (Rp)</label>
+              <label class="block text-slate-600 dark:text-slate-400 text-[10px] mb-0.5 font-medium">Upah Mandor Tahapan
+                (Rp)</label>
               <input type="number" id="modal-m-stage-cost" placeholder="Nominal upah tahapan"
                 class="w-full border border-slate-300 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-900 text-xs">
             </div>
@@ -1438,7 +1489,8 @@
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
       <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
         <h3 class="font-bold text-slate-900 text-base">Buat Tagihan Baru</h3>
-        <button type="button" onclick="closeModal('modalAddInvoice')" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+        <button type="button" onclick="closeModal('modalAddInvoice')"
+          class="text-slate-400 hover:text-slate-600 cursor-pointer">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
@@ -1461,12 +1513,15 @@
 
         <div>
           <label class="block font-semibold text-slate-700 mb-1">Nama Work Order</label>
-          <div id="display-inv-wo-name" class="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 font-medium text-xs">
+          <div id="display-inv-wo-name"
+            class="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 font-medium text-xs">
             -- Pilih Nomor SP/PO terlebih dahulu --
           </div>
           <div id="container-inv-job-select" class="hidden mt-1.5 space-y-1">
-            <label for="modal-inv-job" class="block text-[11px] font-semibold text-slate-600">Pilih Pekerjaan di SP ini:</label>
-            <select id="modal-inv-job" onchange="onInvoiceJobChange()" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 text-xs font-medium">
+            <label for="modal-inv-job" class="block text-[11px] font-semibold text-slate-600">Pilih Pekerjaan di SP
+              ini:</label>
+            <select id="modal-inv-job" onchange="onInvoiceJobChange()"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 text-xs font-medium">
               <!-- Dynamically populated if > 1 job under this SP -->
             </select>
           </div>
@@ -1482,7 +1537,8 @@
 
         <div>
           <label for="modal-inv-date" class="block font-semibold text-slate-700 mb-1">Tanggal Invoice *</label>
-          <input type="date" id="modal-inv-date" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
+          <input type="date" id="modal-inv-date" required
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs">
           <p class="text-[11px] text-slate-400 mt-1">Jatuh tempo otomatis dihitung 2 bulan dari tanggal invoice.</p>
         </div>
 
@@ -1507,7 +1563,8 @@
           <i data-lucide="file-edit" class="w-5 h-5 text-sky-600"></i>
           <span>Edit Data Tagihan (Invoice)</span>
         </h3>
-        <button type="button" onclick="closeModal('modalEditInvoice')" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+        <button type="button" onclick="closeModal('modalEditInvoice')"
+          class="text-slate-400 hover:text-slate-600 cursor-pointer">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
@@ -1524,11 +1581,13 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label for="edit-inv-wo" class="block font-semibold text-slate-700 mb-1">Nomor SP/PO *</label>
-            <input type="text" id="edit-inv-wo" required class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 font-mono">
+            <input type="text" id="edit-inv-wo" required
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 font-mono">
           </div>
           <div>
             <label for="edit-inv-client" class="block font-semibold text-slate-700 mb-1">Klien *</label>
-            <input type="text" id="edit-inv-client" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
+            <input type="text" id="edit-inv-client" required
+              class="w-full border border-slate-300 rounded-lg px-3 py-2">
           </div>
         </div>
 
@@ -1540,11 +1599,13 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label for="edit-inv-amount" class="block font-semibold text-slate-700 mb-1">Nominal Tagihan (Rp) *</label>
-            <input type="number" id="edit-inv-amount" required class="w-full border border-slate-300 rounded-lg px-3 py-2 font-semibold">
+            <input type="number" id="edit-inv-amount" required
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 font-semibold">
           </div>
           <div>
             <label for="edit-inv-status" class="block font-semibold text-slate-700 mb-1">Status Pembayaran *</label>
-            <select id="edit-inv-status" onchange="toggleEditInvoicePaidDate()" class="w-full border border-slate-300 rounded-lg px-3 py-2 font-medium">
+            <select id="edit-inv-status" onchange="toggleEditInvoicePaidDate()"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 font-medium">
               <option value="Draft">Draft</option>
               <option value="BAST Terbit">BAST Terbit</option>
               <option value="Belum Cashbank">Belum Cashbank</option>
@@ -1556,7 +1617,8 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label for="edit-inv-date" class="block font-semibold text-slate-700 mb-1">Tanggal Invoice *</label>
-            <input type="date" id="edit-inv-date" onchange="updateEditInvoiceDueDate()" required class="w-full border border-slate-300 rounded-lg px-3 py-2">
+            <input type="date" id="edit-inv-date" onchange="updateEditInvoiceDueDate()" required
+              class="w-full border border-slate-300 rounded-lg px-3 py-2">
           </div>
           <div>
             <label for="edit-inv-due" class="block font-semibold text-slate-700 mb-1">Jatuh Tempo *</label>
@@ -1566,14 +1628,16 @@
 
         <div id="container-edit-inv-paid" class="hidden">
           <label for="edit-inv-paid-date" class="block font-semibold text-emerald-800 mb-1">Tanggal Pelunasan</label>
-          <input type="date" id="edit-inv-paid-date" class="w-full border border-emerald-300 rounded-lg px-3 py-2 bg-emerald-50 text-emerald-900">
+          <input type="date" id="edit-inv-paid-date"
+            class="w-full border border-emerald-300 rounded-lg px-3 py-2 bg-emerald-50 text-emerald-900">
         </div>
 
         <div class="flex justify-end space-x-3 pt-3 border-t border-slate-100">
           <button type="button" onclick="closeModal('modalEditInvoice')"
             class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">Batal</button>
           <button type="submit"
-            class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow-xs transition cursor-pointer">Simpan Perubahan</button>
+            class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow-xs transition cursor-pointer">Simpan
+            Perubahan</button>
         </div>
       </form>
     </div>
@@ -1589,14 +1653,16 @@
           <i data-lucide="badge-dollar-sign" class="w-5 h-5 text-emerald-600"></i>
           <span>Catat Kas Keluar / Klaim Mandor</span>
         </h3>
-        <button type="button" onclick="closeModal('modalAddMandorPayout')" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+        <button type="button" onclick="closeModal('modalAddMandorPayout')"
+          class="text-slate-400 hover:text-slate-600 cursor-pointer">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
       <form id="formAddMandorPayout" onsubmit="submitNewMandorPayout(event)" class="space-y-3.5 text-xs">
         <div>
-          <label for="add-pay-project" class="block font-semibold text-slate-700 mb-1">Terkait Proyek / Pekerjaan</label>
+          <label for="add-pay-project" class="block font-semibold text-slate-700 mb-1">Terkait Proyek /
+            Pekerjaan</label>
           <select id="add-pay-project" class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50">
             <!-- Dynamically populated from projects -->
           </select>
@@ -1623,7 +1689,8 @@
         </div>
 
         <div>
-          <label for="add-pay-amount" class="block font-semibold text-slate-700 mb-1">Nominal Upah / Kas Keluar (Rp) *</label>
+          <label for="add-pay-amount" class="block font-semibold text-slate-700 mb-1">Nominal Upah / Kas Keluar (Rp)
+            *</label>
           <input type="number" id="add-pay-amount" required placeholder="Contoh: 15000000"
             class="w-full border border-slate-300 rounded-lg px-3 py-2 font-semibold">
         </div>
@@ -1638,7 +1705,8 @@
           <button type="button" onclick="closeModal('modalAddMandorPayout')"
             class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">Batal</button>
           <button type="submit"
-            class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold shadow-xs transition cursor-pointer">Simpan Kas Keluar</button>
+            class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold shadow-xs transition cursor-pointer">Simpan
+            Kas Keluar</button>
         </div>
       </form>
     </div>
@@ -1647,14 +1715,16 @@
   <!-- ============================================================= -->
   <!-- MODAL: EDIT KAS KELUAR / KLAIM MANDOR                         -->
   <!-- ============================================================= -->
-  <div id="modalEditMandorPayout" class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
+  <div id="modalEditMandorPayout"
+    class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
       <div class="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
         <h3 class="font-bold text-slate-900 text-lg flex items-center gap-2">
           <i data-lucide="edit-3" class="w-5 h-5 text-sky-600"></i>
           <span>Edit Kas Keluar / Klaim Mandor</span>
         </h3>
-        <button type="button" onclick="closeModal('modalEditMandorPayout')" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+        <button type="button" onclick="closeModal('modalEditMandorPayout')"
+          class="text-slate-400 hover:text-slate-600 cursor-pointer">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
@@ -1664,8 +1734,10 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label for="edit-pay-mandor" class="block font-semibold text-slate-700 mb-1">Nama Mandor / Penerima *</label>
-            <input type="text" id="edit-pay-mandor" required class="w-full border border-slate-300 rounded-lg px-3 py-2 font-semibold">
+            <label for="edit-pay-mandor" class="block font-semibold text-slate-700 mb-1">Nama Mandor / Penerima
+              *</label>
+            <input type="text" id="edit-pay-mandor" required
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 font-semibold">
           </div>
           <div>
             <label for="edit-pay-stage" class="block font-semibold text-slate-700 mb-1">Tahap / Keperluan *</label>
@@ -1676,7 +1748,8 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label for="edit-pay-amount" class="block font-semibold text-slate-700 mb-1">Nominal Upah (Rp) *</label>
-            <input type="number" id="edit-pay-amount" required class="w-full border border-slate-300 rounded-lg px-3 py-2 font-semibold">
+            <input type="number" id="edit-pay-amount" required
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 font-semibold">
           </div>
           <div>
             <label for="edit-pay-status" class="block font-semibold text-slate-700 mb-1">Status Pembayaran *</label>
@@ -1698,7 +1771,8 @@
           <button type="button" onclick="closeModal('modalEditMandorPayout')"
             class="px-4 py-2 border border-slate-300 rounded-lg font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">Batal</button>
           <button type="submit"
-            class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow-xs transition cursor-pointer">Simpan Perubahan</button>
+            class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold shadow-xs transition cursor-pointer">Simpan
+            Perubahan</button>
         </div>
       </form>
     </div>
