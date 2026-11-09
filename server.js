@@ -1382,14 +1382,41 @@ app.get('/api/bon-material', authenticateToken, (req, res) => {
   if (req.query.project_id) {
     list = list.filter(b => b.project_id === req.query.project_id);
   }
-  res.json(list);
+  const enriched = list.map(b => {
+    const p = (db.projects || []).find(proj => proj.id === b.project_id);
+    const fullWo = p ? (p.job_name || p.cluster_name || p.wo_number) : b.wo_number;
+    const spNum = p ? (p.sp_number || p.wo_number) : (b.sp_number || b.wo_number);
+    return {
+      ...b,
+      wo_number: fullWo,
+      sp_number: spNum,
+      job_name: fullWo,
+      cluster_name: p ? p.cluster_name : '',
+      client_name: p ? p.client_name : '',
+      executor_name: p ? p.executor_name : '',
+      executor_type: p ? p.executor_type : ''
+    };
+  });
+  res.json(enriched);
 });
 
 app.get('/api/bon-material/:id', authenticateToken, (req, res) => {
   const db = readDB();
   const bon = (db.bon_material || []).find(b => b.id === req.params.id);
   if (!bon) return res.status(404).json({ success: false, message: 'Bon material tidak ditemukan.' });
-  res.json(bon);
+  const p = (db.projects || []).find(proj => proj.id === bon.project_id);
+  const fullWo = p ? (p.job_name || p.cluster_name || p.wo_number) : bon.wo_number;
+  const spNum = p ? (p.sp_number || p.wo_number) : (bon.sp_number || bon.wo_number);
+  res.json({
+    ...bon,
+    wo_number: fullWo,
+    sp_number: spNum,
+    job_name: fullWo,
+    cluster_name: p ? p.cluster_name : '',
+    client_name: p ? p.client_name : '',
+    executor_name: p ? p.executor_name : '',
+    executor_type: p ? p.executor_type : ''
+  });
 });
 
 app.post('/api/bon-material', authenticateToken, requireRoles(['direktur', 'superadmin', 'pm']), (req, res) => {
@@ -1404,10 +1431,14 @@ app.post('/api/bon-material', authenticateToken, requireRoles(['direktur', 'supe
     return res.status(409).json({ success: false, message: 'Bon material untuk WO ini sudah ada.', bon: existing });
   }
   const today = new Date().toISOString().split('T')[0];
+  const fullWo = project.job_name || project.cluster_name || project.wo_number;
   const newBon = {
     id: 'bon-' + Date.now(),
     project_id: project.id,
-    wo_number: project.wo_number,
+    wo_number: fullWo,
+    sp_number: project.sp_number || project.wo_number,
+    job_name: fullWo,
+    client_name: project.client_name || '',
     status: 'Draft',
     notes: String(notes || '').trim(),
     items: [],

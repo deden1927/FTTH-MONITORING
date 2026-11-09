@@ -2759,9 +2759,12 @@ async function loadBonMaterialTab() {
 function populateBonWOSelect() {
   const select = document.getElementById('bon-wo-select');
   if (!select) return;
-  select.innerHTML = '<option value="">-- Pilih Work Order --</option>' + projectsData.map(p =>
-    `<option value="${p.id}">${p.wo_number} - ${p.cluster_name}</option>`
-  ).join('');
+  select.innerHTML = '<option value="">-- Pilih Work Order --</option>' + (projectsData || []).map(p => {
+    const sp = p.sp_number || p.wo_number || '-';
+    const wo = p.job_name || p.cluster_name || p.wo_number || '-';
+    const client = p.client_name ? ` (${p.client_name})` : '';
+    return `<option value="${p.id}">[SP: ${sp}] ${wo}${client}</option>`;
+  }).join('');
 }
 
 function onBonWOChange() {
@@ -2792,9 +2795,36 @@ function renderBonDetail(bon) {
   const btnCreate = document.getElementById('btnCreateBon');
   detail.classList.remove('hidden');
   if (btnCreate) btnCreate.style.display = 'none';
-  document.getElementById('bon-detail-wo').textContent = `${bon.wo_number} - Bon Material`;
+
+  // Ambil detail proyek untuk menyajikan data WO secara lengkap & jelas
+  const proj = (projectsData || []).find(p => p.id === bon.project_id);
+  const woFullName = proj ? (proj.job_name || proj.cluster_name || proj.wo_number) : (bon.job_name || bon.wo_number);
+  const spNumber = proj ? (proj.sp_number || proj.wo_number) : (bon.sp_number || bon.wo_number || '-');
+  const clientName = proj?.client_name || bon.client_name || 'Telkom Akses';
+  const executorText = proj && proj.executor_name ? ` • ${proj.executor_type}: ${proj.executor_name}` : '';
+
+  const woTitleEl = document.getElementById('bon-detail-wo');
+  if (woTitleEl) {
+    woTitleEl.innerHTML = `
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+          SP: ${spNumber}
+        </span>
+        <span class="font-bold text-slate-900 dark:text-slate-100 text-sm sm:text-base">
+          ${woFullName}
+        </span>
+        <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">
+          (${clientName})
+        </span>
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+          Bon Material
+        </span>
+      </div>
+    `;
+  }
+
   document.getElementById('bon-detail-meta').textContent =
-    `Dibuat: ${bon.created_at} • Diupdate: ${bon.updated_at} • ${bon.items.length} item`;
+    `Dibuat: ${bon.created_at} • Diupdate: ${bon.updated_at} • ${bon.items.length} jenis material${executorText}`;
   document.getElementById('bon-status-select').value = bon.status;
   renderBonItems();
   if (window.lucide) lucide.createIcons();
@@ -3094,11 +3124,14 @@ function renderBonPendingRequests() {
       </span>
     `).join(' ');
 
+    const proj = (projectsData || []).find(p => p.id === r.project_id);
+    const woDisplay = proj ? `[SP: ${proj.sp_number || proj.wo_number}] ${proj.job_name || proj.cluster_name}` : r.wo_number;
+
     return `
       <div class="p-3.5 rounded-xl border border-amber-200 bg-amber-50/40 hover:bg-amber-50/70 transition flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div class="space-y-1.5 flex-1 min-w-0">
           <div class="flex flex-wrap items-center gap-2">
-            <span class="font-bold text-slate-900 text-xs">${r.wo_number}</span>
+            <span class="font-bold text-slate-900 dark:text-slate-100 text-xs">${woDisplay}</span>
             ${channelBadge}
             <span class="text-[11px] text-slate-500">• Pemohon: <b class="text-slate-700">${requester}</b></span>
             <span class="text-[11px] text-slate-400">• ${dateStr}</span>

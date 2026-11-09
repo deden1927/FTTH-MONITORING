@@ -315,7 +315,7 @@ class TelegramBotService {
     }
 
     const inline_keyboard = activeProjects.slice(0, 15).map(p => ([
-      { text: `${p.wo_number} (${p.client_name})`, callback_data: `req_wo:${p.id}` }
+      { text: `[${p.sp_number || p.wo_number}] ${p.job_name || p.cluster_name || p.wo_number} (${p.client_name})`, callback_data: `req_wo:${p.id}` }
     ]));
 
     await this.sendMessage(chatId, `📦 <b>Pilih Work Order (WO)</b> yang akan diajukan bon material:`, {
