@@ -154,6 +154,26 @@ function readDB() {
       }
     });
 
+    // Auto-normalisasi data invoices (pastikan sp_number dan job_name terpetakan dari project)
+    if (Array.isArray(parsed.invoices)) {
+      parsed.invoices.forEach(inv => {
+        const parentProj = parsed.projects.find(p => p.id === inv.project_id || (p.sp_number && p.sp_number === inv.wo_number) || (p.wo_number && p.wo_number === inv.wo_number));
+        if (parentProj) {
+          if (!inv.sp_number) {
+            inv.sp_number = parentProj.sp_number || inv.wo_number;
+            needSync = true;
+          }
+          if (!inv.job_name) {
+            inv.job_name = parentProj.job_name || parentProj.cluster_name || inv.term_name;
+            needSync = true;
+          }
+        } else if (!inv.sp_number) {
+          inv.sp_number = inv.wo_number || '-';
+          needSync = true;
+        }
+      });
+    }
+
     if (needSync && fs.existsSync(DB_FILE)) {
       writeDB(parsed);
     }
@@ -911,9 +931,14 @@ app.post('/api/invoices', authenticateToken, requireRoles(['finance', 'superadmi
     return res.status(409).json({ success: false, message: `ID Invoice "${rawId}" sudah terdaftar!` });
   }
 
+  const spNumber = String(req.body.sp_number || req.body.wo_number || '').trim();
+  const jobName = String(req.body.job_name || req.body.term_name || '').trim();
+
   const newInv = {
     id: invId,
     project_id: req.body.project_id,
+    sp_number: spNumber,
+    job_name: jobName,
     wo_number: String(req.body.wo_number || '').trim(),
     client_name: String(req.body.client_name || '').trim(),
     term_name: String(req.body.term_name || '').trim(),
@@ -952,7 +977,9 @@ app.put(/^\/api\/invoices\/(?!.*\/status$)(.+)$/, authenticateToken, requireRole
   const idx = (db.invoices || []).findIndex(inv => inv.id === targetId || inv.id === decodeURIComponent(targetId));
   if (idx === -1) return res.status(404).json({ success: false, message: 'Invoice tidak ditemukan.' });
 
-  const { wo_number, client_name, term_name, amount, status, invoice_date, due_date, paid_date } = req.body;
+  const { sp_number, job_name, wo_number, client_name, term_name, amount, status, invoice_date, due_date, paid_date } = req.body;
+  if (sp_number !== undefined) db.invoices[idx].sp_number = String(sp_number).trim();
+  if (job_name !== undefined) db.invoices[idx].job_name = String(job_name).trim();
   if (wo_number !== undefined) db.invoices[idx].wo_number = String(wo_number).trim();
   if (client_name !== undefined) db.invoices[idx].client_name = String(client_name).trim();
   if (term_name !== undefined) db.invoices[idx].term_name = String(term_name).trim();

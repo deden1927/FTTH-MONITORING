@@ -321,15 +321,18 @@ async function waitForServer(timeoutMs = 10000) {
     check('POST /api/invoices (finance) -> 201', newInvoice.status === 201);
     check('Jatuh tempo otomatis 2 bulan setelah invoice_date (2027-01-01)', newInvoice.body.due_date === '2027-01-01');
     check('Nama Work Order tersimpan di invoice term_name', newInvoice.body.term_name === 'Klaster Uji (Nama Work Order)');
+    check('Nomor SP tersimpan di invoice sp_number', newInvoice.body.sp_number === 'WO-TEST-001');
     const testInvId = newInvoice.body.id;
 
     // CRUD INVOICE: PUT /api/invoices/:id & DELETE /api/invoices/:id
     const editInvRes = await req('PUT', `/api/invoices/${testInvId}`, {
       amount: 65000000,
-      term_name: 'Klaster Uji Termin 1 Revisi'
+      term_name: 'Klaster Uji Termin 1 Revisi',
+      sp_number: 'SP-REVISI-001'
     }, FIN_AUTH);
     check('PUT /api/invoices/:id (finance) -> 200', editInvRes.status === 200 && editInvRes.body.success);
     check('Invoice amount berhasil diupdate menjadi 65.000.000', editInvRes.body.invoice.amount === 65000000);
+    check('Invoice sp_number berhasil diupdate menjadi SP-REVISI-001', editInvRes.body.invoice.sp_number === 'SP-REVISI-001');
 
     const delInvRes = await req('DELETE', `/api/invoices/${testInvId}`, null, FIN_AUTH);
     check('DELETE /api/invoices/:id (finance) -> 200', delInvRes.status === 200 && delInvRes.body.success);
@@ -557,7 +560,7 @@ async function waitForServer(timeoutMs = 10000) {
     check('dashboard.html memuat konfigurasi darkMode: class', dashHtmlText.includes("darkMode: 'class'"));
     check('dashboard.html memuat tombol btnThemeToggle', dashHtmlText.includes('btnThemeToggle'));
     check('dashboard.html memuat icon themeIconSun dan themeIconMoon', dashHtmlText.includes('themeIconSun') && dashHtmlText.includes('themeIconMoon'));
-    check('dashboard.html memuat header tabel tagihan kas masuk baru', dashHtmlText.includes('ID Invoice') && dashHtmlText.includes('Nama SP') && dashHtmlText.includes('Total LOP') && dashHtmlText.includes('Nominal Total (Rp)'));
+    check('dashboard.html memuat header tabel tagihan kas masuk baru', dashHtmlText.includes('ID Invoice') && dashHtmlText.includes('Nomor SP/PO') && dashHtmlText.includes('Pekerjaan WO') && dashHtmlText.includes('Umur SP') && dashHtmlText.includes('Nominal Total (Rp)'));
     check('dashboard.html memuat label Estimasi Laba Bersih & Net Margin', dashHtmlText.includes('Estimasi Laba Bersih') && dashHtmlText.includes('Net Margin'));
 
     const appJsRes = await req('GET', '/app.js', null, null);

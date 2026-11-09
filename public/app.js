@@ -575,47 +575,130 @@ function renderClientChart(clientPortfolio) {
   }
 }
 
+function getInvoiceSpAndWoInfo(inv) {
+  const allProjects = Array.isArray(projectsData) ? projectsData : [];
+
+  const matchedProj = allProjects.find(p => {
+    if (inv.project_id && p.id === inv.project_id) return true;
+    const invWo = String(inv.wo_number || '').trim().toLowerCase();
+    const pSp = String(p.sp_number || '').trim().toLowerCase();
+    const pWo = String(p.wo_number || '').trim().toLowerCase();
+    const pJob = String(p.job_name || p.cluster_name || '').trim().toLowerCase();
+    return (invWo && (pSp === invWo || pWo === invWo || pJob === invWo));
+  });
+
+  const clientName = inv.client_name || (matchedProj ? matchedProj.client_name : 'Klien');
+  const spName = inv.sp_number || (matchedProj ? matchedProj.sp_number : null) || inv.wo_number || '-';
+  const woName = inv.job_name || (matchedProj ? (matchedProj.job_name || matchedProj.cluster_name) : null) || inv.term_name || inv.wo_number || '-';
+
+  return { clientName, spName, woName };
+}
+
+function getSpAgeInfo(inv) {
+  const invDateStr = inv.invoice_date || '';
+  if (!invDateStr) {
+    return { days: 0, text: '- Hari', badgeClass: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700' };
+  }
+
+  const parts = invDateStr.split('T')[0].split('-');
+  const dInv = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  const isPaid = inv.status === 'Sudah Cashbank' || inv.status === 'Lunas';
+
+  let dEnd;
+  if (isPaid && inv.paid_date) {
+    const pParts = inv.paid_date.split('T')[0].split('-');
+    dEnd = new Date(Number(pParts[0]), Number(pParts[1]) - 1, Number(pParts[2]));
+  } else {
+    const now = new Date();
+    dEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  }
+
+  const diffTime = dEnd.getTime() - dInv.getTime();
+  const days = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+
+  let badgeClass = 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300 border border-sky-200 dark:border-sky-800';
+  if (days > 60) {
+    badgeClass = 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 font-bold border border-red-200 dark:border-red-800';
+  } else if (days >= 31) {
+    badgeClass = 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-semibold border border-amber-200 dark:border-amber-800';
+  }
+
+  return {
+    days,
+    text: `${days} Hari`,
+    badgeClass
+  };
+}
+
 async function renderAgingTable() {
   const container = document.getElementById('aging-table-container');
   if (!container) return;
 
   try {
-    const res = await fetch('/api/invoices');
-    const invoices = await res.json();
-    const unpaid = invoices.filter(i => i.status !== 'Lunas');
+    const [invRes, projRes] = await Promise.all([
+      fetch('/api/invoices'),
+      (!projectsData || projectsData.length === 0) ? fetch('/api/projects') : Promise.resolve(null)
+    ]);
+    const invoices = await invRes.json();
+    if (projRes) {
+      try {
+        projectsData = await projRes.json();
+      } catch (e) {}
+    }
 
-    if (unpaid.length === 0) {
-      container.innerHTML = `<p class="text-xs text-slate-500 italic py-4 text-center">Semua invoice klien dalam status lunas.</p>`;
+    const activeInvoices = (Array.isArray(invoices) ? invoices : []).filter(i => i.status !== 'Draft');
+
+    if (activeInvoices.length === 0) {
+      container.innerHTML = `<p class="text-xs text-slate-500 italic py-4 text-center">Belum ada tagihan invoice.</p>`;
       return;
     }
 
+    // Prioritaskan yang Belum Cashbank di bagian atas (umur terlama dulu)
+    activeInvoices.sort((a, b) => {
+      const aPaid = (a.status === 'Sudah Cashbank' || a.status === 'Lunas') ? 1 : 0;
+      const bPaid = (b.status === 'Sudah Cashbank' || b.status === 'Lunas') ? 1 : 0;
+      if (aPaid !== bPaid) return aPaid - bPaid;
+      return new Date(b.invoice_date || 0) - new Date(a.invoice_date || 0);
+    });
+
     container.innerHTML = `
       <table class="w-full text-left text-xs">
-        <thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+        <thead class="bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 font-semibold border-b border-slate-200 dark:border-slate-700">
           <tr>
-            <th class="py-2 px-2.5">Klien / SP</th>
-            <th class="py-2 px-2.5 text-right">Nominal</th>
-            <th class="py-2 px-2.5">Jatuh Tempo</th>
-            <th class="py-2 px-2.5">Status Aging</th>
+            <th class="py-2.5 px-3">Klien / SP</th>
+            <th class="py-2.5 px-3 text-right">Nominal</th>
+            <th class="py-2.5 px-3">Status</th>
+            <th class="py-2.5 px-3">Umur SP</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-slate-100">
-          ${unpaid.map(inv => {
-            let badgeClass = 'bg-slate-100 text-slate-700';
-            if (inv.aging_category.includes('> 60')) badgeClass = 'bg-red-100 text-red-700 font-bold';
-            else if (inv.aging_category.includes('31')) badgeClass = 'bg-amber-100 text-amber-800 font-semibold';
-            else badgeClass = 'bg-sky-100 text-sky-800';
+        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+          ${activeInvoices.map(inv => {
+            const info = getInvoiceSpAndWoInfo(inv);
+            const ageInfo = getSpAgeInfo(inv);
+
+            const isLunas = inv.status === 'Sudah Cashbank' || inv.status === 'Lunas';
+            const displayStatus = (inv.status === 'Invoice Terkirim' || !inv.status || inv.status === 'Belum Cashbank')
+              ? 'Belum Cashbank'
+              : (isLunas ? 'Sudah Cashbank' : inv.status);
+
+            let statusBadge = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700';
+            if (displayStatus === 'BAST Terbit') statusBadge = 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300 border border-sky-200 dark:border-sky-800';
+            if (displayStatus === 'Belum Cashbank') statusBadge = 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-semibold border border-amber-200 dark:border-amber-800';
+            if (isLunas) statusBadge = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800';
 
             return `
-              <tr class="hover:bg-slate-50">
-                <td class="py-2.5 px-2.5">
-                  <div class="font-bold text-slate-800">${inv.client_name}</div>
-                  <div class="text-[11px] text-slate-400">${inv.wo_number} • ${inv.term_name}</div>
+              <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
+                <td class="py-2.5 px-3">
+                  <div class="font-bold text-slate-900 dark:text-slate-100">${info.clientName}</div>
+                  <div class="text-[11px] font-mono font-bold text-sky-700 dark:text-sky-400">SP/PO: ${info.spName}</div>
+                  <div class="text-[11px] text-slate-500 dark:text-slate-400">WO: ${info.woName}</div>
                 </td>
-                <td class="py-2.5 px-2.5 text-right font-bold text-slate-900">${formatIDR(inv.amount)}</td>
-                <td class="py-2.5 px-2.5 text-slate-600">${inv.due_date}</td>
-                <td class="py-2.5 px-2.5">
-                  <span class="px-2 py-0.5 rounded text-[10px] ${badgeClass}">${inv.aging_category}</span>
+                <td class="py-2.5 px-3 text-right font-bold text-slate-900 dark:text-slate-100">${formatIDR(inv.amount)}</td>
+                <td class="py-2.5 px-3">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${statusBadge}">${displayStatus}</span>
+                </td>
+                <td class="py-2.5 px-3">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${ageInfo.badgeClass}">${ageInfo.text}</span>
                 </td>
               </tr>
             `;
@@ -1134,27 +1217,30 @@ async function loadInvoices() {
 
     tbody.innerHTML = invoicesData.map(inv => {
       const isLunas = inv.status === 'Sudah Cashbank' || inv.status === 'Lunas';
-      let statusBadge = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
-      if (inv.status === 'BAST Terbit') statusBadge = 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300';
-      if (inv.status === 'Belum Cashbank' || inv.status === 'Invoice Terkirim') statusBadge = 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300';
-      if (isLunas) statusBadge = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold';
+      let statusBadge = 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700';
+      if (inv.status === 'BAST Terbit') statusBadge = 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300 border border-sky-200 dark:border-sky-800';
+      if (inv.status === 'Belum Cashbank' || inv.status === 'Invoice Terkirim') statusBadge = 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-semibold border border-amber-200 dark:border-amber-800';
+      if (isLunas) statusBadge = 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800';
 
       const canManage = currentUser && ['superadmin', 'finance', 'direktur'].includes(currentUser.role);
       const displayStatus = (inv.status === 'Invoice Terkirim' || !inv.status || inv.status === 'Belum Cashbank')
         ? 'Belum Cashbank'
         : (isLunas ? 'Sudah Cashbank' : inv.status);
 
+      const info = getInvoiceSpAndWoInfo(inv);
+      const ageInfo = getSpAgeInfo(inv);
+
       return `
         <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors">
           <td class="p-3 font-mono font-bold text-slate-900 dark:text-slate-100">${inv.id}</td>
-          <td class="p-3 font-semibold text-slate-800 dark:text-slate-200">${inv.client_name}</td>
-          <td class="p-3 text-slate-600 dark:text-slate-400 font-mono">${inv.wo_number}</td>
-          <td class="p-3 text-slate-700 dark:text-slate-300">${inv.term_name}</td>
+          <td class="p-3 font-semibold text-slate-800 dark:text-slate-200">${info.clientName}</td>
+          <td class="p-3 text-sky-700 dark:text-sky-400 font-mono font-bold">${info.spName}</td>
+          <td class="p-3 text-slate-700 dark:text-slate-300 font-medium">${info.woName}</td>
           <td class="p-3 text-right font-bold text-slate-900 dark:text-slate-100">${formatIDR(inv.amount)}</td>
           <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-semibold ${statusBadge}">${displayStatus}</span></td>
           <td class="p-3 text-slate-600 dark:text-slate-400">${inv.invoice_date}</td>
           <td class="p-3 text-slate-600 dark:text-slate-400">${inv.due_date}</td>
-          <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium">${inv.aging_category}</span></td>
+          <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-semibold ${ageInfo.badgeClass}">${ageInfo.text}</span></td>
           <td class="p-3 text-center">
             <div class="flex items-center justify-center gap-1.5">
               ${!isLunas && canManage ? `
@@ -2583,6 +2669,8 @@ async function submitNewInvoice(e) {
       body: JSON.stringify({
         id,
         project_id,
+        sp_number: wo_number,
+        job_name: term_name,
         wo_number,
         client_name,
         term_name,
