@@ -162,11 +162,29 @@ async function waitForServer(timeoutMs = 10000) {
       notes: 'Surat Jalan #SJ-9981'
     }, PM_AUTH);
     check('POST /api/material-inbounds (pm) -> 201', inbRes.status === 201 && inbRes.body.success);
+    check('POST /api/material-inbounds mengembalikan material', !!inbRes.body.material && inbRes.body.material.id === 'mat-seed-001');
     const inbId = inbRes.body && inbRes.body.inbound ? inbRes.body.inbound.id : 'inb-none';
+
+    // Inbound via format payload web dashboard (qty_in, arrival_date, supplier_surat_jalan)
+    const inbWebRes = await req('POST', '/api/material-inbounds', {
+      material_id: 'mat-seed-001',
+      qty_in: 25,
+      arrival_date: '2026-11-05',
+      supplier_surat_jalan: 'SJ-WEB-001',
+      notes: 'Datang dari web UI'
+    }, PM_AUTH);
+    check('POST /api/material-inbounds payload web (qty_in) -> 201', inbWebRes.status === 201 && inbWebRes.body.success);
+
+    // Validasi penolakan jika qty <= 0 atau material_id kosong
+    const inbInvalidRes = await req('POST', '/api/material-inbounds', {
+      material_id: 'mat-seed-001',
+      qty_in: 0
+    }, PM_AUTH);
+    check('POST /api/material-inbounds qty <= 0 -> 400', inbInvalidRes.status === 400 && !inbInvalidRes.body.success);
 
     const matsAfterInb = await req('GET', '/api/materials', null, AUTH);
     const mat001 = matsAfterInb.body.find(m => m.id === 'mat-seed-001');
-    check('stok gudang bertambah otomatis (+50)', !!mat001 && mat001.stock_qty >= 50);
+    check('stok gudang bertambah otomatis (+75)', !!mat001 && mat001.stock_qty >= 75);
 
     const inbList = await req('GET', '/api/material-inbounds', null, AUTH);
     check('GET /api/material-inbounds -> 200 + array', inbList.status === 200 && inbList.body.length >= 1);

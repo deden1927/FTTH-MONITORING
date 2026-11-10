@@ -1666,8 +1666,9 @@ app.get('/api/material-inbounds', authenticateToken, (req, res) => {
 
 app.post('/api/material-inbounds', authenticateToken, requireRoles(['direktur', 'superadmin', 'pm', 'admin']), (req, res) => {
   const db = readDB();
-  const { material_id, qty, supplier, received_date, notes } = req.body;
-  const numQty = parseInt(qty, 10);
+  const { material_id, qty, qty_in, supplier, supplier_surat_jalan, received_date, arrival_date, notes, recorded_by_name } = req.body;
+  const rawQty = qty !== undefined ? qty : qty_in;
+  const numQty = Number(rawQty);
   if (!material_id || isNaN(numQty) || numQty <= 0) {
     return res.status(400).json({ success: false, message: 'Material dan jumlah valid (>0) wajib diisi!' });
   }
@@ -1677,6 +1678,10 @@ app.post('/api/material-inbounds', authenticateToken, requireRoles(['direktur', 
     return res.status(404).json({ success: false, message: 'Material tidak ditemukan di master data.' });
   }
 
+  const resolvedSupplier = String(supplier || supplier_surat_jalan || '').trim();
+  const resolvedDate = received_date || arrival_date || new Date().toISOString().split('T')[0];
+  const resolvedUser = req.user ? req.user.name : (recorded_by_name || 'User');
+
   const newInbound = {
     id: 'inb-' + Date.now(),
     material_id: mat.id,
@@ -1685,10 +1690,14 @@ app.post('/api/material-inbounds', authenticateToken, requireRoles(['direktur', 
     variant: mat.variant || '',
     unit: mat.unit || 'pcs',
     qty: numQty,
-    supplier: String(supplier || '').trim(),
+    qty_in: numQty,
+    supplier: resolvedSupplier,
+    supplier_surat_jalan: resolvedSupplier,
     notes: String(notes || '').trim(),
-    received_date: received_date || new Date().toISOString().split('T')[0],
-    created_by: req.user ? req.user.name : 'User',
+    received_date: resolvedDate,
+    arrival_date: resolvedDate,
+    created_by: resolvedUser,
+    recorded_by_name: resolvedUser,
     created_at: new Date().toISOString()
   };
 
@@ -1699,7 +1708,12 @@ app.post('/api/material-inbounds', authenticateToken, requireRoles(['direktur', 
   mat.stock_qty = (Number(mat.stock_qty) || 0) + numQty;
 
   writeDB(db);
-  res.status(201).json({ success: true, message: 'Material datang berhasil dicatat, stok gudang bertambah.', inbound: newInbound });
+  res.status(201).json({
+    success: true,
+    message: 'Material datang berhasil dicatat, stok gudang bertambah.',
+    inbound: newInbound,
+    material: mat
+  });
 });
 
 app.delete('/api/material-inbounds/:id', authenticateToken, requireRoles(['direktur', 'superadmin']), (req, res) => {
@@ -1711,7 +1725,8 @@ app.delete('/api/material-inbounds/:id', authenticateToken, requireRoles(['direk
   // Revert stok gudang
   const mat = (db.materials || []).find(m => m.id === removed.material_id);
   if (mat) {
-    mat.stock_qty = Math.max(0, (Number(mat.stock_qty) || 0) - Number(removed.qty || 0));
+    const revertQty = Number(removed.qty !== undefined ? removed.qty : removed.qty_in) || 0;
+    mat.stock_qty = Math.max(0, (Number(mat.stock_qty) || 0) - revertQty);
   }
 
   writeDB(db);

@@ -3744,7 +3744,7 @@ function populateInboundMaterialOptions() {
 async function submitMaterialInbound(e) {
   e.preventDefault();
   const matSelect = document.getElementById('inb-modal-material');
-  const opt = matSelect.selectedOptions[0];
+  const opt = matSelect ? matSelect.selectedOptions[0] : null;
   const qty = Number(document.getElementById('inb-modal-qty').value) || 0;
   const arrDate = document.getElementById('inb-modal-date').value;
   const supplier = document.getElementById('inb-modal-supplier').value.trim();
@@ -3761,8 +3761,11 @@ async function submitMaterialInbound(e) {
 
   const payload = {
     material_id: opt.value,
+    qty: qty,
     qty_in: qty,
+    received_date: arrDate,
     arrival_date: arrDate,
+    supplier: supplier,
     supplier_surat_jalan: supplier,
     notes: notes,
     recorded_by_name: currentUser ? currentUser.name : 'Web User'
@@ -3778,7 +3781,10 @@ async function submitMaterialInbound(e) {
     if (res.ok) {
       closeModal('modalMaterialInbound');
       document.getElementById('formMaterialInbound').reset();
-      alert(`Stok masuk berhasil dicatat. Stok ${data.material.name} sekarang: ${data.material.stock_qty} ${data.material.unit}`);
+      const matName = data.material?.name || data.inbound?.material_name || opt.getAttribute('data-name') || 'Material';
+      const matStock = data.material?.stock_qty !== undefined ? data.material.stock_qty : (data.inbound ? data.inbound.qty : '');
+      const matUnit = data.material?.unit || data.inbound?.unit || opt.getAttribute('data-unit') || '';
+      alert(`Stok masuk berhasil dicatat. Stok ${matName} sekarang: ${matStock} ${matUnit}`);
       await loadMaterials();
       renderMaterialsList();
       populateBonItemMaterialOptions();
@@ -3814,8 +3820,10 @@ async function loadMaterialInbounds() {
     const canDelete = currentUser && ['superadmin', 'direktur'].includes(currentUser.role);
 
     tbody.innerHTML = materialInboundsData.map(item => {
-      const dateStr = item.arrival_date || (item.created_at ? item.created_at.split('T')[0] : '-');
-      const recorder = item.recorded_by_name || (item.recorded_by_telegram_id ? `Telegram ID: ${item.recorded_by_telegram_id}` : '-');
+      const dateStr = item.arrival_date || item.received_date || (item.created_at ? item.created_at.split('T')[0] : '-');
+      const recorder = item.recorded_by_name || item.created_by || (item.recorded_by_telegram_id ? `Telegram ID: ${item.recorded_by_telegram_id}` : '-');
+      const displayQty = item.qty_in !== undefined ? item.qty_in : (item.qty !== undefined ? item.qty : 0);
+      const supplierStr = item.supplier_surat_jalan || item.supplier || '-';
 
       return `
         <tr class="hover:bg-slate-50">
@@ -3826,10 +3834,10 @@ async function loadMaterialInbounds() {
           </td>
           <td class="p-3 text-center whitespace-nowrap">
             <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">
-              +${item.qty_in} ${item.unit || ''}
+              +${displayQty} ${item.unit || ''}
             </span>
           </td>
-          <td class="p-3 text-slate-600">${item.supplier_surat_jalan || '-'}</td>
+          <td class="p-3 text-slate-600">${supplierStr}</td>
           <td class="p-3 text-slate-500 text-[11px]">${recorder}</td>
           <td class="p-3 text-center whitespace-nowrap">
             ${canDelete ? `
