@@ -238,7 +238,7 @@ async function waitForServer(timeoutMs = 10000) {
     const mat001AfterUsed = matsAfterUsed.body.find(m => m.id === 'mat-seed-001');
     check('stok gudang terpotong manual sesuai yang terpasang (-10)', !!mat001AfterUsed && mat001AfterUsed.stock_qty === (stockBeforeUsed - 10));
 
-    // Telegram Users Management
+    // Telegram Users Management & Bot Active Projects
     const addTgUser = await req('POST', '/api/telegram-users', {
       telegram_id: '123456789',
       name: 'Rudi Teknisi',
@@ -251,6 +251,27 @@ async function waitForServer(timeoutMs = 10000) {
 
     const delTgUser = await req('DELETE', '/api/telegram-users/123456789', null, AUTH);
     check('DELETE /api/telegram-users/:id -> 200', delTgUser.status === 200 && delTgUser.body.success);
+
+    // Bot Active Projects logic check
+    const TelegramBotService = require('../telegram-bot');
+    const mockBot = new TelegramBotService({
+      readDB: () => ({
+        projects: [
+          { id: 'p1', wo_number: 'WO-1', status: 'In-Progress' },
+          { id: 'p2', wo_number: 'WO-2', status: 'Done' },
+          { id: 'p3', wo_number: 'WO-3', status: 'In-Progress' }
+        ],
+        milestones: [
+          { project_id: 'p1', status: 'Done' },
+          { project_id: 'p1', status: 'In-Progress' },
+          { project_id: 'p2', status: 'Done' },
+          { project_id: 'p3', status: 'Done' },
+          { project_id: 'p3', status: 'Done' }
+        ]
+      })
+    });
+    const botActive = mockBot.getActiveProjects();
+    check('bot getActiveProjects memfilter hanya WO Aktif (p1 aktif, p2 Done diabaikan, p3 all milestones Done diabaikan)', botActive.length === 1 && botActive[0].id === 'p1');
 
     // =============================================================
     // MASTER EKSEKUTOR CRUD & PROTEKSI WO AKTIF
@@ -581,9 +602,12 @@ async function waitForServer(timeoutMs = 10000) {
     check('dashboard.html memuat header tabel tagihan kas masuk baru', dashHtmlText.includes('ID Invoice') && dashHtmlText.includes('Nomor SP/PO') && dashHtmlText.includes('Pekerjaan WO') && dashHtmlText.includes('Umur SP') && dashHtmlText.includes('Nominal Total (Rp)'));
     check('dashboard.html memuat label Estimasi Laba Bersih & Net Margin', dashHtmlText.includes('Estimasi Laba Bersih') && dashHtmlText.includes('Net Margin'));
 
+    check('dashboard.html memuat dropdown Bon Material hanya WO Aktif', dashHtmlText.includes('Pilih Work Order Aktif'));
+
     const appJsRes = await req('GET', '/app.js', null, null);
     check('GET /app.js -> 200', appJsRes.status === 200);
     const appJsText = typeof appJsRes.body === 'string' ? appJsRes.body : JSON.stringify(appJsRes.body);
+    check('app.js memuat fungsi isProjectActive untuk Bon Material', appJsText.includes('function isProjectActive'));
     check('app.js memuat fungsi toggleTheme & isDarkMode', appJsText.includes('function toggleTheme') && appJsText.includes('function isDarkMode'));
 
     const indexHtmlRes = await req('GET', '/index.html', null, null);

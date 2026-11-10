@@ -3251,7 +3251,12 @@ async function loadBonMaterials() {
 }
 
 async function loadBonMaterialTab() {
-  await Promise.all([loadMaterials(), loadBonMaterials(), loadBonRequests()]);
+  await Promise.all([
+    loadMaterials(),
+    loadBonMaterials(),
+    loadBonRequests(),
+    (!projectsData || projectsData.length === 0) ? loadProjects() : Promise.resolve()
+  ]);
   populateBonWOSelect();
   populateBonItemMaterialOptions();
   renderMaterialsList();
@@ -3259,15 +3264,37 @@ async function loadBonMaterialTab() {
   onBonWOChange();
 }
 
+function isProjectActive(p) {
+  if (!p) return false;
+  if (p.status === 'Done' || p.status === 'Selesai') return false;
+  if (p.progress_percent !== undefined && Number(p.progress_percent) >= 100) return false;
+  return true;
+}
+
 function populateBonWOSelect() {
   const select = document.getElementById('bon-wo-select');
   if (!select) return;
-  select.innerHTML = '<option value="">-- Pilih Work Order --</option>' + (projectsData || []).map(p => {
+  const currentVal = select.value;
+  const activeProjects = (projectsData || []).filter(isProjectActive);
+
+  if (activeProjects.length === 0) {
+    select.innerHTML = '<option value="">-- Tidak ada Work Order Aktif --</option>';
+    return;
+  }
+
+  let html = '<option value="">-- Pilih Work Order Aktif --</option>';
+  html += activeProjects.map(p => {
     const sp = p.sp_number || p.wo_number || '-';
     const wo = p.job_name || p.cluster_name || p.wo_number || '-';
     const client = p.client_name ? ` (${p.client_name})` : '';
-    return `<option value="${p.id}">[SP: ${sp}] ${wo}${client}</option>`;
+    const progress = p.progress_percent !== undefined ? ` [${p.progress_percent}%]` : '';
+    return `<option value="${p.id}">[SP: ${sp}] ${wo}${client}${progress}</option>`;
   }).join('');
+  select.innerHTML = html;
+
+  if (currentVal && activeProjects.some(p => p.id === currentVal)) {
+    select.value = currentVal;
+  }
 }
 
 function onBonWOChange() {

@@ -223,7 +223,9 @@ class TelegramBotService {
     }
 
     // Handle tombol keyboard menu utama
-    if (text === '📦 Request Material WO') {
+    if (text === '⚡ Pilihan WO Aktif' || text.includes('WO Aktif') || text === '/wo' || text === '/wo_aktif') {
+      return this.showActiveProjects(chatId, user);
+    } else if (text === '📦 Request Material WO') {
       return this.startBonRequestFlow(chatId, user);
     } else if (text === '📋 Cek Status Bon & Request') {
       return this.showBonStatusList(chatId, user);
@@ -267,24 +269,26 @@ class TelegramBotService {
 
     if (role === 'teknisi') {
       buttons = [
-        [{ text: '📦 Request Material WO' }],
+        [{ text: '⚡ Pilihan WO Aktif' }, { text: '📦 Request Material WO' }],
         [{ text: '📋 Cek Status Bon & Request' }]
       ];
     } else if (role === 'admin') {
       buttons = [
-        [{ text: '📦 Request Material WO' }, { text: '📥 Input Material Datang' }],
-        [{ text: '📋 Cek Status Bon & Request' }, { text: '🏭 Cek Stok Gudang' }]
+        [{ text: '⚡ Pilihan WO Aktif' }, { text: '📦 Request Material WO' }],
+        [{ text: '📥 Input Material Datang' }, { text: '🏭 Cek Stok Gudang' }],
+        [{ text: '📋 Cek Status Bon & Request' }]
       ];
     } else if (role === 'pm') {
       buttons = [
-        [{ text: '✅ Antrean Approval Bon' }, { text: '📋 Cek Status Bon & Request' }],
-        [{ text: '🏭 Cek Stok Gudang' }, { text: '📥 Input Material Datang' }]
+        [{ text: '⚡ Pilihan WO Aktif' }, { text: '✅ Antrean Approval Bon' }],
+        [{ text: '📋 Cek Status Bon & Request' }, { text: '🏭 Cek Stok Gudang' }],
+        [{ text: '📥 Input Material Datang' }]
       ];
     } else if (role === 'superadmin') {
       buttons = [
-        [{ text: '✅ Antrean Approval Bon' }, { text: '📦 Request Material WO' }],
-        [{ text: '📥 Input Material Datang' }, { text: '🏭 Cek Stok Gudang' }],
-        [{ text: '📋 Cek Status Bon & Request' }],
+        [{ text: '⚡ Pilihan WO Aktif' }, { text: '✅ Antrean Approval Bon' }],
+        [{ text: '📦 Request Material WO' }, { text: '📥 Input Material Datang' }],
+        [{ text: '🏭 Cek Stok Gudang' }, { text: '📋 Cek Status Bon & Request' }],
         [{ text: '👑 Dashboard Superadmin' }]
       ];
     }
@@ -304,21 +308,105 @@ class TelegramBotService {
   }
 
   // -------------------------------------------------------------
+  // 6b. HELPER & FLOW: PILIHAN WO AKTIF (MANAJEMEN WO & LAPANGAN)
+  // -------------------------------------------------------------
+  getActiveProjects() {
+    const db = this.getDB();
+    return (db.projects || []).filter(p => {
+      if (p.status === 'Done' || p.status === 'Selesai') return false;
+      const pMilestones = (db.milestones || []).filter(m => m.project_id === p.id);
+      if (pMilestones.length > 0 && pMilestones.every(m => m.status === 'Done')) {
+        return false;
+      }
+      return true;
+    }).map(p => {
+      const pMilestones = (db.milestones || []).filter(m => m.project_id === p.id);
+      const doneCount = pMilestones.filter(m => m.status === 'Done').length;
+      const totalCount = pMilestones.length || 4;
+      const progress = Math.round((doneCount / totalCount) * 100);
+      return {
+        ...p,
+        milestones: pMilestones,
+        progress_percent: progress
+      };
+    });
+  }
+
+  async showActiveProjects(chatId, user) {
+    const activeProjects = this.getActiveProjects();
+    if (activeProjects.length === 0) {
+      return this.sendMessage(chatId,
+        `ℹ️ <b>Tidak ada Work Order (WO) Aktif</b> saat ini.\n\n` +
+        `Semua pekerjaan di lapangan telah selesai (100%) atau belum ada WO baru di Manajemen WO & Lapangan.`
+      );
+    }
+
+    let msg = `⚡ <b>Daftar Pilihan Work Order (WO) Aktif</b>\n` +
+      `<i>Total: <b>${activeProjects.length} Pekerjaan</b> sedang berjalan di lapangan</i>\n` +
+      `──────────────────────────\n\n`;
+
+    const inline_keyboard = [];
+
+    activeProjects.slice(0, 10).forEach((p, idx) => {
+      const spNum = p.sp_number || p.wo_number || '-';
+      const jobName = p.job_name || p.cluster_name || p.wo_number || '-';
+      const client = p.client_name || '-';
+      const progress = p.progress_percent || 0;
+      const exec = p.executor_name || (p.executor_type === 'Internal' ? 'Tim Internal' : 'Mandor');
+
+      const mSummaries = (p.milestones || []).map((m, mIdx) => {
+        const mNames = ['Tiang', 'KU Fiber', 'ODP', 'ATP'];
+        const name = mNames[mIdx] || (m.stage_name ? m.stage_name.slice(0, 8) : `M${mIdx + 1}`);
+        const icon = m.status === 'Done' ? '✅' : (m.status === 'Blocked' ? '⛔' : (m.status === 'In-Progress' ? '🔄' : '⏳'));
+        return `${icon} ${name}`;
+      }).join(' • ');
+
+      msg += `<b>${idx + 1}. [SP: ${spNum}]</b>\n` +
+        `📍 Pekerjaan: <b>${jobName}</b>\n` +
+        `🏢 Klien: <b>${client}</b>\n` +
+        `📊 Progres Fisik: <b>${progress}%</b> [${p.status || 'In-Progress'}]\n` +
+        `👷 Tim Lapangan: <i>${p.executor_type || 'Mandor'} (${exec})</i>\n` +
+        (mSummaries ? `📌 Milestone: ${mSummaries}\n` : '') +
+        `\n`;
+
+      inline_keyboard.push([
+        {
+          text: `📦 Request Bon: ${jobName.slice(0, 26)}`,
+          callback_data: `req_wo:${p.id}`
+        }
+      ]);
+    });
+
+    if (activeProjects.length > 10) {
+      msg += `<i>... dan ${activeProjects.length - 10} pekerjaan aktif lainnya.</i>\n\n`;
+    }
+
+    msg += `<i>Pilih tombol di bawah untuk langsung mengajukan request material ke WO terkait:</i>`;
+
+    await this.sendMessage(chatId, msg, {
+      reply_markup: { inline_keyboard }
+    });
+  }
+
+  // -------------------------------------------------------------
   // 7. FLOW: REQUEST BON MATERIAL PER WO (TEKNISI / ADMIN)
   // -------------------------------------------------------------
   async startBonRequestFlow(chatId, user) {
-    const db = this.getDB();
-    const activeProjects = (db.projects || []).filter(p => p.status !== 'Done');
+    const activeProjects = this.getActiveProjects();
 
     if (activeProjects.length === 0) {
-      return this.sendMessage(chatId, `⚠️ Tidak ada Work Order aktif saat ini untuk diajukan bon material.`);
+      return this.sendMessage(chatId, `⚠️ <b>Tidak ada Work Order aktif</b> saat ini untuk diajukan bon material.`);
     }
 
     const inline_keyboard = activeProjects.slice(0, 15).map(p => ([
-      { text: `[${p.sp_number || p.wo_number}] ${p.job_name || p.cluster_name || p.wo_number} (${p.client_name})`, callback_data: `req_wo:${p.id}` }
+      {
+        text: `[${p.sp_number || p.wo_number}] ${p.job_name || p.cluster_name || p.wo_number} (${p.client_name}) [${p.progress_percent}%]`,
+        callback_data: `req_wo:${p.id}`
+      }
     ]));
+    inline_keyboard.push([{ text: '❌ Batal', callback_data: 'req_cancel' }]);
 
-    await this.sendMessage(chatId, `📦 <b>Pilih Work Order (WO)</b> yang akan diajukan bon material:`, {
+    await this.sendMessage(chatId, `📦 <b>Pilih Work Order (WO) Aktif</b> yang akan diajukan bon material:`, {
       reply_markup: { inline_keyboard }
     });
   }
