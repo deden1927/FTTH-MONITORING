@@ -71,24 +71,92 @@ class TelegramBotService {
   }
 
   // -------------------------------------------------------------
-  // 2. LIFECYCLE & POLLING
+  // 2. LIFECYCLE, MULTI-PROCESS LOCK & POLLING
   // -------------------------------------------------------------
+  isPidAlive(pid) {
+    if (!pid || isNaN(pid)) return false;
+    try {
+      process.kill(Number(pid), 0);
+      return true;
+    } catch (err) {
+      return err.code === 'EPERM'; // Proses hidup tapi milik user lain
+    }
+  }
+
+  acquireLock() {
+    const lockDir = path.join(__dirname, 'data');
+    if (!fs.existsSync(lockDir)) {
+      try { fs.mkdirSync(lockDir, { recursive: true }); } catch (_) {}
+    }
+    const lockFile = path.join(lockDir, 'telegram-bot.lock');
+
+    if (fs.existsSync(lockFile)) {
+      try {
+        const raw = fs.readFileSync(lockFile, 'utf8');
+        const lock = JSON.parse(raw);
+        if (lock && lock.pid && lock.pid !== process.pid && this.isPidAlive(lock.pid)) {
+          console.log(`[Telegram Bot] Bot sudah aktif di proses lain (PID: ${lock.pid}). Polling dinonaktifkan pada worker PID ${process.pid} ini untuk mencegah respon ganda.`);
+          return false;
+        }
+      } catch (_) {
+        // Lock file rusak/kosong, timpa
+      }
+    }
+
+    try {
+      fs.writeFileSync(lockFile, JSON.stringify({ pid: process.pid, started_at: Date.now() }), 'utf8');
+      this.lockFile = lockFile;
+      return true;
+    } catch (err) {
+      console.error('[Telegram Bot] Gagal menulis lock file:', err.message);
+      return true;
+    }
+  }
+
+  releaseLock() {
+    if (this.lockFile && fs.existsSync(this.lockFile)) {
+      try {
+        const raw = fs.readFileSync(this.lockFile, 'utf8');
+        const lock = JSON.parse(raw);
+        if (lock && lock.pid === process.pid) {
+          fs.unlinkSync(this.lockFile);
+        }
+      } catch (_) {}
+    }
+  }
+
   async start() {
     if (!this.token) {
       console.log('[Telegram Bot] TELEGRAM_BOT_TOKEN belum diset di .env. Bot dinonaktifkan.');
       return;
     }
+    if (this.isRunning) return;
+
+    if (!this.acquireLock()) {
+      return;
+    }
+
     this.isRunning = true;
+    const cleanup = () => {
+      this.stop();
+      this.releaseLock();
+    };
+    process.once('exit', cleanup);
+    process.once('SIGINT', cleanup);
+    process.once('SIGTERM', cleanup);
+
     try {
       const me = await this.apiCall('getMe');
       if (me && me.ok) {
-        console.log(`[Telegram Bot] Aktif sebagai @${me.result.username} (ID: ${me.result.id})`);
+        console.log(`[Telegram Bot] Aktif sebagai @${me.result.username} (ID: ${me.result.id}, PID: ${process.pid})`);
         this.poll();
       } else {
         console.error('[Telegram Bot] Gagal terhubung ke Telegram. Periksa token.');
+        this.releaseLock();
       }
     } catch (err) {
       console.error('[Telegram Bot] Gagal inisialisasi bot:', err.message);
+      this.releaseLock();
     }
   }
 
@@ -98,6 +166,7 @@ class TelegramBotService {
       clearTimeout(this.pollingTimeout);
       this.pollingTimeout = null;
     }
+    this.releaseLock();
   }
 
   async poll() {
@@ -154,6 +223,21 @@ class TelegramBotService {
   // 4. UPDATE DISPATCHER
   // -------------------------------------------------------------
   async handleUpdate(update) {
+    if (!update) return;
+
+    // Deduplikasi update_id agar update yang sama tidak pernah dieksekusi 2 kali
+    if (update.update_id) {
+      if (!this.processedUpdates) this.processedUpdates = new Set();
+      if (this.processedUpdates.has(update.update_id)) {
+        return;
+      }
+      this.processedUpdates.add(update.update_id);
+      if (this.processedUpdates.size > 2000) {
+        const arr = Array.from(this.processedUpdates);
+        this.processedUpdates = new Set(arr.slice(-1000));
+      }
+    }
+
     try {
       if (update.message) {
         await this.handleMessage(update.message);
