@@ -2214,6 +2214,14 @@
 
       <form id="formMaterialInbound" onsubmit="submitMaterialInbound(event)" class="space-y-4 text-xs">
         <div>
+          <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Pilih Work Order Aktif *</label>
+          <select id="inb-modal-wo" onchange="onInboundWOChange()"
+            class="w-full border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-2 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-medium">
+            <!-- Populated dynamically with active WOs -->
+          </select>
+        </div>
+
+        <div>
           <label class="block font-semibold text-slate-700 mb-1">Pilih Material *</label>
           <select id="inb-modal-material" required
             class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 font-medium">
@@ -2288,6 +2296,7 @@
             <tr>
               <th class="p-3">Tanggal</th>
               <th class="p-3">Material</th>
+              <th class="p-3">Work Order / SP</th>
               <th class="p-3 text-center">Jumlah Masuk</th>
               <th class="p-3">Supplier / Surat Jalan</th>
               <th class="p-3">Dicatat Oleh</th>

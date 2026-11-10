@@ -354,7 +354,7 @@ class TelegramBotService {
     if (role === 'teknisi') {
       buttons = [
         [{ text: '⚡ Pilihan WO Aktif' }, { text: '📦 Request Material WO' }],
-        [{ text: '📋 Cek Status Bon & Request' }]
+        [{ text: '📥 Input Material Datang' }, { text: '📋 Cek Status Bon & Request' }]
       ];
     } else if (role === 'admin') {
       buttons = [
@@ -529,16 +529,69 @@ class TelegramBotService {
   }
 
   // -------------------------------------------------------------
-  // 8. FLOW: INBOUND MATERIAL DATANG (GUDANG)
+  // 8. FLOW: INBOUND MATERIAL DATANG (WO AKTIF & LAPANGAN)
   // -------------------------------------------------------------
   async startInboundFlow(chatId, user) {
-    const categories = ['Tiang', 'Kabel', 'ODP', 'Aksesoris Tiang', 'Slack Support', 'Lainnya'];
-    const inline_keyboard = categories.map(c => ([
-      { text: `📥 Masuk: ${c}`, callback_data: `inb_cat:${c}` }
-    ]));
+    const activeProjects = this.getActiveProjects();
+
+    const inline_keyboard = [];
+    if (activeProjects.length > 0) {
+      activeProjects.slice(0, 15).forEach(p => {
+        const spNum = p.sp_number || p.wo_number || '-';
+        const jobName = p.job_name || p.cluster_name || p.wo_number || '-';
+        const client = p.client_name ? ` (${p.client_name})` : '';
+        inline_keyboard.push([{
+          text: `📍 [SP: ${spNum}] ${jobName.slice(0, 30)}${client}`,
+          callback_data: `inb_wo:${p.id}`
+        }]);
+      });
+    }
+
+    inline_keyboard.push([{ text: '🏭 Stok Umum Gudang (Tanpa WO)', callback_data: 'inb_wo:general' }]);
     inline_keyboard.push([{ text: '❌ Batal', callback_data: 'inb_cancel' }]);
 
-    await this.sendMessage(chatId, `📥 <b>Input Material Datang ke Gudang</b>\nPilih kategori material yang tiba:`, {
+    const text = `📥 <b>Input Material Datang ke Lapangan / Teknisi</b>\n\n` +
+      `Pilih <b>Work Order (WO) Aktif</b> tujuan penyerahan material:`;
+
+    await this.sendMessage(chatId, text, {
+      reply_markup: { inline_keyboard }
+    });
+  }
+
+  async promptInboundMaterialSelection(chatId, projId) {
+    const db = this.getDB();
+    const isGeneral = projId === 'general';
+    const project = isGeneral ? null : (db.projects || []).find(p => p.id === projId);
+
+    const inline_keyboard = [];
+
+    // Jika terkait WO, tampilkan material yang sudah terdaftar di Bon WO untuk shortcut cepat
+    if (project) {
+      const bon = (db.bon_material || []).find(b => b.project_id === project.id);
+      if (bon && Array.isArray(bon.items) && bon.items.length > 0) {
+        bon.items.forEach(it => {
+          const planned = it.qty_planned || 0;
+          const arrived = it.qty_arrived || 0;
+          inline_keyboard.push([{
+            text: `📦 ${it.name} (Rencana: ${planned}, Datang: ${arrived} ${it.unit})`,
+            callback_data: `inb_mat:${projId}:${it.material_id}`
+          }]);
+        });
+      }
+    }
+
+    inline_keyboard.push([{ text: '📁 Pilih dari Kategori Lain / Baru', callback_data: `inb_cat_menu:${projId}` }]);
+    inline_keyboard.push([{ text: '🔙 Ganti WO', callback_data: 'inb_back_wo' }]);
+    inline_keyboard.push([{ text: '❌ Batal', callback_data: 'inb_cancel' }]);
+
+    const title = project
+      ? `WO: <b>[SP: ${project.sp_number || project.wo_number}] ${project.job_name || project.cluster_name}</b> (${project.client_name || '-'})`
+      : `<b>Stok Umum Gudang (Tanpa WO)</b>`;
+
+    const text = `📥 <b>Pilih Material yang Datang</b>\n${title}\n\n` +
+      `Pilih barang yang diserahkan/tiba untuk dicatat:`;
+
+    await this.sendMessage(chatId, text, {
       reply_markup: { inline_keyboard }
     });
   }
@@ -650,56 +703,128 @@ class TelegramBotService {
 
     // 2. Input Qty Inbound Material Datang
     if (session.step === 'inb_input_qty') {
-      const qty = parseInt(text, 10);
+      const cleanText = text.trim().replace(/,/g, '.');
+      const qty = parseFloat(cleanText);
       if (isNaN(qty) || qty <= 0) {
-        return this.sendMessage(chatId, `⚠️ Masukkan angka jumlah stok masuk yang valid (lebih dari 0):`);
+        return this.sendMessage(chatId, `⚠️ Masukkan angka jumlah yang valid (lebih dari 0, contoh: 50 atau 12.5):`);
       }
       session.data.qty = qty;
       session.step = 'inb_input_supplier';
-      return this.sendMessage(chatId, `Masukkan <b>Asal Barang / Supplier / Nomor Surat Jalan</b>:\n(Ketik "-" jika tidak ada)`);
+      return this.sendMessage(chatId, `Masukkan <b>Asal Barang / Supplier / Nomor Surat Jalan / Catatan</b>:\n(Ketik "-" jika tidak ada)`);
     }
 
-    // 3. Input Supplier Inbound
+    // 3. Input Supplier & Simpan Inbound Material Datang
     if (session.step === 'inb_input_supplier') {
-      session.data.supplier = text === '-' ? '' : text;
+      const rawNotes = text.trim();
+      session.data.supplier = rawNotes === '-' ? '' : rawNotes;
       const mat = session.data.mat;
+      const project = session.data.project;
       const db = this.getDB();
+      const numQty = Number(session.data.qty) || 0;
+      const resolvedSupplier = session.data.supplier || '';
+      const today = new Date().toISOString().split('T')[0];
 
       const newInbound = {
         id: 'inb-' + Date.now(),
+        project_id: project ? project.id : null,
+        wo_number: project ? (project.job_name || project.cluster_name || project.wo_number) : '',
+        sp_number: project ? (project.sp_number || project.wo_number) : '',
+        client_name: project ? project.client_name : '',
         material_id: mat.id,
         material_name: mat.name,
         category: mat.category,
         variant: mat.variant || '',
         unit: mat.unit || 'pcs',
-        qty: session.data.qty,
-        supplier: session.data.supplier,
-        notes: 'Input via Bot Telegram oleh ' + user.name,
-        received_date: new Date().toISOString().split('T')[0],
+        qty: numQty,
+        qty_in: numQty,
+        supplier: resolvedSupplier,
+        supplier_surat_jalan: resolvedSupplier,
+        notes: resolvedSupplier ? resolvedSupplier : ('Input via Bot Telegram oleh ' + user.name + ' (' + user.role + ')'),
+        received_date: today,
+        arrival_date: today,
         created_by: user.name,
+        recorded_by_name: user.name,
+        recorded_by_telegram_id: user.telegram_id,
+        recorded_by_role: user.role,
         created_at: new Date().toISOString()
       };
 
       if (!Array.isArray(db.material_inbounds)) db.material_inbounds = [];
       db.material_inbounds.push(newInbound);
 
-      // Tambahkan stock_qty ke material
+      // Tambahkan stock_qty ke master material
       const mIdx = (db.materials || []).findIndex(m => m.id === mat.id);
-      let newStock = session.data.qty;
+      let newStock = numQty;
       if (mIdx !== -1) {
-        db.materials[mIdx].stock_qty = (Number(db.materials[mIdx].stock_qty) || 0) + session.data.qty;
+        db.materials[mIdx].stock_qty = (Number(db.materials[mIdx].stock_qty) || 0) + numQty;
         newStock = db.materials[mIdx].stock_qty;
+      }
+
+      // Jika dialokasikan untuk WO, otomatis perbarui Bon Material WO tersebut (qty_arrived & qty_remaining)
+      let bonItemRef = null;
+      if (project) {
+        if (!Array.isArray(db.bon_material)) db.bon_material = [];
+        let bon = db.bon_material.find(b => b.project_id === project.id);
+        if (!bon) {
+          bon = {
+            id: 'bon-' + project.id,
+            project_id: project.id,
+            wo_number: project.job_name || project.cluster_name || project.wo_number,
+            sp_number: project.sp_number || project.wo_number,
+            status: 'Disetujui',
+            notes: 'Dibuat otomatis saat pelaporan material datang via Telegram',
+            items: [],
+            created_by: user.name,
+            created_at: today,
+            updated_at: today
+          };
+          db.bon_material.push(bon);
+        }
+
+        if (!Array.isArray(bon.items)) bon.items = [];
+        let bonItem = bon.items.find(it => it.material_id === mat.id);
+        if (bonItem) {
+          bonItem.qty_arrived = (Number(bonItem.qty_arrived) || 0) + numQty;
+          bonItem.qty_remaining = bonItem.qty_arrived - (Number(bonItem.qty_used) || 0);
+        } else {
+          bonItem = {
+            id: 'boni-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+            material_id: mat.id,
+            name: mat.name,
+            category: mat.category || 'Lainnya',
+            variant: mat.variant || '',
+            unit: mat.unit || 'pcs',
+            qty_planned: 0,
+            qty_arrived: numQty,
+            qty_used: 0,
+            qty_remaining: numQty
+          };
+          bon.items.push(bonItem);
+        }
+        bon.updated_at = today;
+        bonItemRef = bonItem;
       }
 
       this.saveDB(db);
       this.userSessions.delete(chatId);
 
+      const targetTitle = project
+        ? `📍 WO: <b>[SP: ${project.sp_number || project.wo_number}] ${project.job_name || project.cluster_name}</b>\n🏢 Klien: <b>${project.client_name}</b>\n`
+        : `🏭 Lokasi: <b>Stok Umum Gudang</b>\n`;
+
+      const bonStatus = bonItemRef
+        ? `📊 Status Bon WO: <b>${bonItemRef.qty_arrived} ${mat.unit} Datang</b> (Sisa di Lapangan: <b>${bonItemRef.qty_remaining} ${mat.unit}</b>)\n`
+        : `🏭 Total Stok Gudang: <b>${newStock} ${mat.unit}</b>\n`;
+
       await this.sendMessage(chatId,
-        `✅ <b>Material Datang Berhasil Dicatat!</b>\n\n` +
-        `Barang: <b>${mat.name}${mat.variant ? ' ' + mat.variant : ''}</b>\n` +
-        `Jumlah Masuk: <b>+${session.data.qty} ${mat.unit}</b>\n` +
-        `Stok Gudang Sekarang: <b>${newStock} ${mat.unit}</b>\n` +
-        `Supplier/Catatan: ${session.data.supplier || '-'}`
+        `✅ <b>Laporan Material Datang Berhasil Dicatat!</b>\n\n` +
+        targetTitle +
+        `📦 Barang: <b>${mat.name}${mat.variant ? ' ' + mat.variant : ''}</b>\n` +
+        `📥 Jumlah Masuk: <b>+${numQty} ${mat.unit}</b>\n` +
+        bonStatus +
+        `📄 Surat Jalan / Catatan: ${resolvedSupplier || '-'}\n` +
+        `👤 Dicatat oleh: <b>${user.name} (${user.role.toUpperCase()})</b>\n\n` +
+        `<i>Data otomatis tersinkron ke website & Bon Material WO terkait. Admin tidak perlu mendata ulang.</i>`
       );
       return;
     }
@@ -950,9 +1075,32 @@ class TelegramBotService {
       return;
     }
 
-    // 11. Material Datang Inbound
+    // 11. Material Datang Inbound (WO Aktif & Lapangan)
+    if (data.startsWith('inb_wo:')) {
+      const projId = data.split(':')[1];
+      await this.answerCallbackQuery(cb.id);
+      return this.promptInboundMaterialSelection(chatId, projId);
+    }
+
+    if (data.startsWith('inb_cat_menu:')) {
+      const projId = data.split(':')[1];
+      const categories = ['Tiang', 'Kabel', 'ODP', 'Aksesoris Tiang', 'Slack Support', 'Lainnya'];
+      const inline_keyboard = categories.map(c => ([
+        { text: `📁 Kategori: ${c}`, callback_data: `inb_cat:${projId}:${c}` }
+      ]));
+      inline_keyboard.push([{ text: '🔙 Kembali', callback_data: `inb_wo:${projId}` }]);
+      inline_keyboard.push([{ text: '❌ Batal', callback_data: 'inb_cancel' }]);
+
+      await this.answerCallbackQuery(cb.id);
+      return this.sendMessage(chatId, `Pilih <b>Kategori Material yang Datang</b>:`, {
+        reply_markup: { inline_keyboard }
+      });
+    }
+
     if (data.startsWith('inb_cat:')) {
-      const cat = data.split(':')[1];
+      const parts = data.split(':');
+      const projId = parts.length > 2 ? parts[1] : 'general';
+      const cat = parts.length > 2 ? parts[2] : parts[1];
       const db = this.getDB();
       const mats = (db.materials || []).filter(m => (m.category || 'Lainnya') === cat);
       if (mats.length === 0) {
@@ -960,31 +1108,46 @@ class TelegramBotService {
       }
 
       const inline_keyboard = mats.slice(0, 20).map(m => ([
-        { text: `${m.name}${m.variant ? ' ' + m.variant : ''}`, callback_data: `inb_mat:${m.id}` }
+        { text: `${m.name}${m.variant ? ' ' + m.variant : ''} (${m.unit})`, callback_data: `inb_mat:${projId}:${m.id}` }
       ]));
+      inline_keyboard.push([{ text: '🔙 Kembali ke Kategori', callback_data: `inb_cat_menu:${projId}` }]);
       inline_keyboard.push([{ text: '❌ Batal', callback_data: 'inb_cancel' }]);
 
       await this.answerCallbackQuery(cb.id);
-      return this.sendMessage(chatId, `Pilih <b>Material yang Tiba</b>:`, {
+      return this.sendMessage(chatId, `Pilih <b>Material (${cat}) yang Tiba</b>:`, {
         reply_markup: { inline_keyboard }
       });
     }
 
     if (data.startsWith('inb_mat:')) {
-      const matId = data.split(':')[1];
+      const parts = data.split(':');
+      const projId = parts.length > 2 ? parts[1] : 'general';
+      const matId = parts.length > 2 ? parts[2] : parts[1];
       const db = this.getDB();
       const mat = (db.materials || []).find(m => m.id === matId);
       if (!mat) return this.answerCallbackQuery(cb.id, 'Material tidak ditemukan', true);
 
+      const project = projId === 'general' ? null : (db.projects || []).find(p => p.id === projId);
+
       this.userSessions.set(chatId, {
         step: 'inb_input_qty',
-        data: { mat }
+        data: { projectId: projId, project, mat }
       });
       await this.answerCallbackQuery(cb.id);
+
+      const targetLabel = project
+        ? `untuk WO <b>[SP: ${project.sp_number || project.wo_number}] ${project.job_name || project.cluster_name}</b>`
+        : `ke <b>Stok Umum Gudang</b>`;
+
       return this.sendMessage(chatId,
-        `Berapa banyak <b>${mat.name}${mat.variant ? ' ' + mat.variant : ''}</b> (${mat.unit}) yang masuk ke gudang?\n` +
-        `Ketik angka saja:`
+        `Berapa banyak <b>${mat.name}${mat.variant ? ' ' + mat.variant : ''}</b> (${mat.unit}) yang diserahkan/datang ${targetLabel}?\n\n` +
+        `Ketik angka saja (contoh: 25 atau 50):`
       );
+    }
+
+    if (data === 'inb_back_wo') {
+      await this.answerCallbackQuery(cb.id);
+      return this.startInboundFlow(chatId, user);
     }
 
     if (data === 'inb_cancel') {

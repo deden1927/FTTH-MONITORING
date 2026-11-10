@@ -1664,9 +1664,9 @@ app.get('/api/material-inbounds', authenticateToken, (req, res) => {
   res.json(db.material_inbounds || []);
 });
 
-app.post('/api/material-inbounds', authenticateToken, requireRoles(['direktur', 'superadmin', 'pm', 'admin']), (req, res) => {
+app.post('/api/material-inbounds', authenticateToken, requireRoles(['direktur', 'superadmin', 'pm', 'admin', 'teknisi']), (req, res) => {
   const db = readDB();
-  const { material_id, qty, qty_in, supplier, supplier_surat_jalan, received_date, arrival_date, notes, recorded_by_name } = req.body;
+  const { material_id, qty, qty_in, supplier, supplier_surat_jalan, received_date, arrival_date, notes, recorded_by_name, project_id } = req.body;
   const rawQty = qty !== undefined ? qty : qty_in;
   const numQty = Number(rawQty);
   if (!material_id || isNaN(numQty) || numQty <= 0) {
@@ -1681,9 +1681,14 @@ app.post('/api/material-inbounds', authenticateToken, requireRoles(['direktur', 
   const resolvedSupplier = String(supplier || supplier_surat_jalan || '').trim();
   const resolvedDate = received_date || arrival_date || new Date().toISOString().split('T')[0];
   const resolvedUser = req.user ? req.user.name : (recorded_by_name || 'User');
+  const targetProj = project_id ? (db.projects || []).find(p => p.id === project_id) : null;
 
   const newInbound = {
     id: 'inb-' + Date.now(),
+    project_id: targetProj ? targetProj.id : (project_id || null),
+    wo_number: targetProj ? (targetProj.job_name || targetProj.cluster_name || targetProj.wo_number) : '',
+    sp_number: targetProj ? (targetProj.sp_number || targetProj.wo_number) : '',
+    client_name: targetProj ? targetProj.client_name : '',
     material_id: mat.id,
     material_name: mat.name,
     category: mat.category,
@@ -1707,12 +1712,58 @@ app.post('/api/material-inbounds', authenticateToken, requireRoles(['direktur', 
   // Otomatis menambah stok gudang
   mat.stock_qty = (Number(mat.stock_qty) || 0) + numQty;
 
+  // Jika dialokasikan untuk WO tertentu, sinkronkan ke Bon Material WO tersebut (qty_arrived & qty_remaining)
+  let updatedBon = null;
+  if (targetProj) {
+    if (!Array.isArray(db.bon_material)) db.bon_material = [];
+    let bon = db.bon_material.find(b => b.project_id === targetProj.id);
+    if (!bon) {
+      bon = {
+        id: 'bon-' + targetProj.id,
+        project_id: targetProj.id,
+        wo_number: targetProj.job_name || targetProj.cluster_name || targetProj.wo_number,
+        sp_number: targetProj.sp_number || targetProj.wo_number,
+        status: 'Disetujui',
+        notes: 'Dibuat otomatis saat pencatatan material datang',
+        items: [],
+        created_by: resolvedUser,
+        created_at: resolvedDate,
+        updated_at: resolvedDate
+      };
+      db.bon_material.push(bon);
+    }
+
+    if (!Array.isArray(bon.items)) bon.items = [];
+    let bonItem = bon.items.find(it => it.material_id === mat.id);
+    if (bonItem) {
+      bonItem.qty_arrived = (Number(bonItem.qty_arrived) || 0) + numQty;
+      bonItem.qty_remaining = bonItem.qty_arrived - (Number(bonItem.qty_used) || 0);
+    } else {
+      bonItem = {
+        id: 'boni-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+        material_id: mat.id,
+        name: mat.name,
+        category: mat.category || 'Lainnya',
+        variant: mat.variant || '',
+        unit: mat.unit || 'pcs',
+        qty_planned: 0,
+        qty_arrived: numQty,
+        qty_used: 0,
+        qty_remaining: numQty
+      };
+      bon.items.push(bonItem);
+    }
+    bon.updated_at = resolvedDate;
+    updatedBon = bon;
+  }
+
   writeDB(db);
   res.status(201).json({
     success: true,
     message: 'Material datang berhasil dicatat, stok gudang bertambah.',
     inbound: newInbound,
-    material: mat
+    material: mat,
+    bon: updatedBon
   });
 });
 
@@ -1722,11 +1773,24 @@ app.delete('/api/material-inbounds/:id', authenticateToken, requireRoles(['direk
   if (idx === -1) return res.status(404).json({ success: false, message: 'Catatan material datang tidak ditemukan.' });
 
   const [removed] = db.material_inbounds.splice(idx, 1);
+  const revertQty = Number(removed.qty !== undefined ? removed.qty : removed.qty_in) || 0;
+
   // Revert stok gudang
   const mat = (db.materials || []).find(m => m.id === removed.material_id);
   if (mat) {
-    const revertQty = Number(removed.qty !== undefined ? removed.qty : removed.qty_in) || 0;
     mat.stock_qty = Math.max(0, (Number(mat.stock_qty) || 0) - revertQty);
+  }
+
+  // Revert bon material qty_arrived jika terkait WO
+  if (removed.project_id && Array.isArray(db.bon_material)) {
+    const bon = db.bon_material.find(b => b.project_id === removed.project_id);
+    if (bon && Array.isArray(bon.items)) {
+      const bonItem = bon.items.find(it => it.material_id === removed.material_id);
+      if (bonItem) {
+        bonItem.qty_arrived = Math.max(0, (Number(bonItem.qty_arrived) || 0) - revertQty);
+        bonItem.qty_remaining = bonItem.qty_arrived - (Number(bonItem.qty_used) || 0);
+      }
+    }
   }
 
   writeDB(db);

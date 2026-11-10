@@ -3744,9 +3744,29 @@ async function rejectBonRequestWeb(reqId) {
 }
 
 // -------------------------------------------------------------
-// 12. MATERIAL INBOUND (MATERIAL DATANG KE GUDANG)
+// 12. MATERIAL INBOUND (MATERIAL DATANG KE GUDANG / TEKNISI)
 // -------------------------------------------------------------
 function populateInboundMaterialOptions() {
+  const woSelect = document.getElementById('inb-modal-wo');
+  if (woSelect) {
+    const activeProjects = (projectsData || []).filter(isProjectActive);
+    let woHtml = '<option value="">-- Pilih Work Order Aktif --</option>';
+    woHtml += activeProjects.map(p => {
+      const sp = p.sp_number || p.wo_number || '-';
+      const wo = p.job_name || p.cluster_name || p.wo_number || '-';
+      const client = p.client_name ? ` (${p.client_name})` : '';
+      return `<option value="${p.id}">[SP: ${sp}] ${wo}${client}</option>`;
+    }).join('');
+    woHtml += '<option value="__GENERAL__">-- Stok Umum Gudang (Tanpa WO) --</option>';
+    woSelect.innerHTML = woHtml;
+
+    // Auto-select WO jika sedang aktif dibuka di tab Bon Material
+    const curBonWo = document.getElementById('bon-wo-select')?.value;
+    if (curBonWo && activeProjects.some(p => p.id === curBonWo)) {
+      woSelect.value = curBonWo;
+    }
+  }
+
   const select = document.getElementById('inb-modal-material');
   if (!select) return;
   const grouped = {};
@@ -3768,6 +3788,26 @@ function populateInboundMaterialOptions() {
   }
 }
 
+function onInboundWOChange() {
+  const woId = document.getElementById('inb-modal-wo')?.value;
+  if (!woId || woId === '__GENERAL__') return;
+  const bon = (bonData || []).find(b => b.project_id === woId);
+  const select = document.getElementById('inb-modal-material');
+  if (!select || !bon || !bon.items || bon.items.length === 0) return;
+
+  // Berikan highlight untuk material yang sudah terdaftar di Bon WO tersebut
+  const bonMatIds = new Set(bon.items.map(it => it.material_id));
+  const options = Array.from(select.options);
+  options.forEach(opt => {
+    if (bonMatIds.has(opt.value)) {
+      const it = bon.items.find(x => x.material_id === opt.value);
+      if (!opt.text.includes('[Di Bon WO:')) {
+        opt.text = `⭐ ${opt.text} [Di Bon WO: Rencana ${it.qty_planned}, Datang ${it.qty_arrived}]`;
+      }
+    }
+  });
+}
+
 async function submitMaterialInbound(e) {
   e.preventDefault();
   const matSelect = document.getElementById('inb-modal-material');
@@ -3776,6 +3816,8 @@ async function submitMaterialInbound(e) {
   const arrDate = document.getElementById('inb-modal-date').value;
   const supplier = document.getElementById('inb-modal-supplier').value.trim();
   const notes = document.getElementById('inb-modal-notes').value.trim();
+  const woSelect = document.getElementById('inb-modal-wo');
+  const selectedProjId = (woSelect && woSelect.value && woSelect.value !== '__GENERAL__') ? woSelect.value : null;
 
   if (!opt || !opt.value) {
     alert('Pilih material terlebih dahulu.');
@@ -3787,6 +3829,7 @@ async function submitMaterialInbound(e) {
   }
 
   const payload = {
+    project_id: selectedProjId,
     material_id: opt.value,
     qty: qty,
     qty_in: qty,
@@ -3811,11 +3854,13 @@ async function submitMaterialInbound(e) {
       const matName = data.material?.name || data.inbound?.material_name || opt.getAttribute('data-name') || 'Material';
       const matStock = data.material?.stock_qty !== undefined ? data.material.stock_qty : (data.inbound ? data.inbound.qty : '');
       const matUnit = data.material?.unit || data.inbound?.unit || opt.getAttribute('data-unit') || '';
-      alert(`Stok masuk berhasil dicatat. Stok ${matName} sekarang: ${matStock} ${matUnit}`);
-      await loadMaterials();
+      const woInfo = data.inbound?.wo_number ? ` untuk WO "${data.inbound.wo_number}"` : '';
+      alert(`Stok masuk berhasil dicatat${woInfo}. Stok gudang sekarang: ${matStock} ${matUnit}`);
+      await Promise.all([loadMaterials(), loadBonMaterials(), loadMaterialInbounds()]);
       renderMaterialsList();
       populateBonItemMaterialOptions();
       renderMaterialStock();
+      onBonWOChange();
     } else {
       alert(data.message || 'Gagal mencatat material masuk.');
     }
@@ -3836,7 +3881,7 @@ async function loadMaterialInbounds() {
     if (materialInboundsData.length === 0) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="6" class="p-6 text-center text-slate-400 text-xs">
+          <td colspan="7" class="p-6 text-center text-slate-400 text-xs">
             Belum ada riwayat material datang.
           </td>
         </tr>
@@ -3858,6 +3903,12 @@ async function loadMaterialInbounds() {
           <td class="p-3 font-semibold text-slate-800">
             ${item.material_name || item.material_id}
             ${item.notes ? `<div class="text-[10px] text-slate-400 font-normal italic mt-0.5">${item.notes}</div>` : ''}
+          </td>
+          <td class="p-3 text-slate-700">
+            ${item.wo_number ? `
+              <div class="font-bold text-slate-900">${item.wo_number}</div>
+              <div class="text-[10px] text-slate-400">SP: ${item.sp_number || '-'} ${item.client_name ? `(${item.client_name})` : ''}</div>
+            ` : '<span class="text-slate-400 italic">Stok Umum Gudang</span>'}
           </td>
           <td class="p-3 text-center whitespace-nowrap">
             <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">

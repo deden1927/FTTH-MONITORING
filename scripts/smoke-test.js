@@ -21,6 +21,7 @@ const token = (role) => jwt.sign({ id: 'smoke-' + role, role, name: 'Smoke ' + r
 const AUTH = { Authorization: `Bearer ${token('superadmin')}` };
 const PM_AUTH = { Authorization: `Bearer ${token('pm')}` };
 const FIN_AUTH = { Authorization: `Bearer ${token('finance')}` };
+const TEK_AUTH = { Authorization: `Bearer ${token('teknisi')}` };
 
 // Seed DB isolasi: satu proyek uji
 fs.writeFileSync(TMP_DB, JSON.stringify({
@@ -175,6 +176,20 @@ async function waitForServer(timeoutMs = 10000) {
     }, PM_AUTH);
     check('POST /api/material-inbounds payload web (qty_in) -> 201', inbWebRes.status === 201 && inbWebRes.body.success);
 
+    // Inbound untuk WO tertentu oleh teknisi (sinkron ke Bon Material WO)
+    const inbWoRes = await req('POST', '/api/material-inbounds', {
+      project_id: 'proj-test',
+      material_id: 'mat-seed-001',
+      qty: 15,
+      notes: 'Diserahkan ke teknisi lapangan untuk WO proj-test'
+    }, TEK_AUTH);
+    check('POST /api/material-inbounds oleh role teknisi -> 201', inbWoRes.status === 201 && inbWoRes.body.success);
+    check('POST /api/material-inbounds WO mengembalikan data bon', !!inbWoRes.body.bon && inbWoRes.body.bon.project_id === 'proj-test');
+
+    const bonAfterInb = await req('GET', '/api/bon-material?project_id=proj-test', null, AUTH);
+    const itemInBon = bonAfterInb.body[0]?.items?.find(it => it.material_id === 'mat-seed-001');
+    check('item di Bon Material WO otomatis bertambah qty_arrived (+15)', !!itemInBon && itemInBon.qty_arrived >= 15);
+
     // Validasi penolakan jika qty <= 0 atau material_id kosong
     const inbInvalidRes = await req('POST', '/api/material-inbounds', {
       material_id: 'mat-seed-001',
@@ -184,7 +199,7 @@ async function waitForServer(timeoutMs = 10000) {
 
     const matsAfterInb = await req('GET', '/api/materials', null, AUTH);
     const mat001 = matsAfterInb.body.find(m => m.id === 'mat-seed-001');
-    check('stok gudang bertambah otomatis (+75)', !!mat001 && mat001.stock_qty >= 75);
+    check('stok gudang bertambah otomatis (+90)', !!mat001 && mat001.stock_qty >= 90);
 
     const inbList = await req('GET', '/api/material-inbounds', null, AUTH);
     check('GET /api/material-inbounds -> 200 + array', inbList.status === 200 && inbList.body.length >= 1);
@@ -603,11 +618,13 @@ async function waitForServer(timeoutMs = 10000) {
     check('dashboard.html memuat label Estimasi Laba Bersih & Net Margin', dashHtmlText.includes('Estimasi Laba Bersih') && dashHtmlText.includes('Net Margin'));
 
     check('dashboard.html memuat dropdown Bon Material hanya WO Aktif', dashHtmlText.includes('Pilih Work Order Aktif'));
+    check('dashboard.html memuat dropdown WO Aktif pada modal Material Inbound', dashHtmlText.includes('inb-modal-wo'));
 
     const appJsRes = await req('GET', '/app.js', null, null);
     check('GET /app.js -> 200', appJsRes.status === 200);
     const appJsText = typeof appJsRes.body === 'string' ? appJsRes.body : JSON.stringify(appJsRes.body);
     check('app.js memuat fungsi isProjectActive untuk Bon Material', appJsText.includes('function isProjectActive'));
+    check('app.js memuat fungsi onInboundWOChange dan populateInboundMaterialOptions', appJsText.includes('onInboundWOChange') && appJsText.includes('populateInboundMaterialOptions'));
     check('app.js memuat fungsi toggleTheme & isDarkMode', appJsText.includes('function toggleTheme') && appJsText.includes('function isDarkMode'));
 
     const indexHtmlRes = await req('GET', '/index.html', null, null);
