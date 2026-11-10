@@ -288,6 +288,36 @@ async function waitForServer(timeoutMs = 10000) {
     const botActive = mockBot.getActiveProjects();
     check('bot getActiveProjects memfilter hanya WO Aktif (p1 aktif, p2 Done diabaikan, p3 all milestones Done diabaikan)', botActive.length === 1 && botActive[0].id === 'p1');
 
+    // Bot Inbound Multi-Item Loop & Batch Save check
+    const mockInboundDb = {
+      materials: [
+        { id: 'm-1', name: 'Kabel FO', category: 'Kabel', unit: 'm', stock_qty: 100 },
+        { id: 'm-2', name: 'Klem', category: 'Aksesoris Tiang', unit: 'pcs', stock_qty: 50 }
+      ],
+      projects: [{ id: 'p-inb', wo_number: 'WO-INB', job_name: 'Pekerjaan Inbound Test' }],
+      bon_material: [],
+      material_inbounds: []
+    };
+    const mockInbBot = new TelegramBotService({
+      token: 'mock',
+      readDB: () => mockInboundDb,
+      writeDB: (d) => Object.assign(mockInboundDb, d)
+    });
+    mockInbBot.sendMessage = async () => ({ ok: true });
+    await mockInbBot.saveInboundBatch('999', {
+      projectId: 'p-inb',
+      project: mockInboundDb.projects[0],
+      items: [
+        { material_id: 'm-1', name: 'Kabel FO', category: 'Kabel', unit: 'm', qty: 200, supplier: 'SJ-01' },
+        { material_id: 'm-2', name: 'Klem', category: 'Aksesoris Tiang', unit: 'pcs', qty: 30, supplier: 'SJ-01' }
+      ]
+    }, { name: 'Teknisi Test', role: 'teknisi', telegram_id: '999' });
+
+    check('bot saveInboundBatch menyimpan multiple material inbounds', mockInboundDb.material_inbounds.length === 2);
+    check('bot saveInboundBatch menambah stok material 1 (+200 -> 300)', mockInboundDb.materials[0].stock_qty === 300);
+    check('bot saveInboundBatch menambah stok material 2 (+30 -> 80)', mockInboundDb.materials[1].stock_qty === 80);
+    check('bot saveInboundBatch mensinkronkan Bon WO item qty_arrived', mockInboundDb.bon_material[0].items.length === 2 && mockInboundDb.bon_material[0].items[0].qty_arrived === 200);
+
     // =============================================================
     // MASTER EKSEKUTOR CRUD & PROTEKSI WO AKTIF
     // =============================================================
